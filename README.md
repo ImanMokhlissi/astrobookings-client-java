@@ -5,8 +5,11 @@
 Cliente de consola en Java 21 para la API de ejemplo del curso Programación Inteligente: permite
 listar lanzamientos, registrarse, reservar plazas y consultar las reservas. Se construyó con Claude
 Code siguiendo Spec-Driven Development: cada funcionalidad parte de una spec con criterios de
-aceptación y pasa por una cadena de agentes, con revisión humana. La versión actual es la v0.4.0,
-con 392 tests unitarios y 46 end-to-end. Es un ejercicio de formación, no un producto para
+aceptación y pasa por una cadena de agentes. Hubo revisión humana del PRD, el ADD y cada spec antes
+de fusionarlos, una confirmación antes de cada release y pruebas manuales del cliente, que
+encontraron un bug que los tests automáticos no detectaron: en Git Bash,
+`System.console().readPassword()` devuelve una cadena vacía (solución provisional:
+`winpty java -jar ...` o PowerShell). La versión actual es la v0.4.0, con 392 tests unitarios y 46 end-to-end. Es un ejercicio de formación, no un producto para
 producción. El resto del documento está en inglés, como el proyecto.
 
 ## What it is
@@ -92,8 +95,12 @@ the original data, stop the API, run `git checkout -- db/` in its repository and
 
 The client was built with [Claude Code](https://claude.com/claude-code), following AI-Driven and
 Spec-Driven Development: each piece of work starts as a spec with acceptance criteria, and a chain
-of specialized agents takes it from there. Each step had human review. Within `/build`, the one
-stop that is mandatory every time is the confirmation before a release.
+of specialized agents takes it from there.
+
+Human review of the PRD, ADD and every spec before merging, a confirmation before every release, and
+manual testing of the client. The manual test found a bug the automated tests missed: in Git Bash,
+`System.console().readPassword()` returns an empty string (workaround: `winpty java -jar ...` or
+PowerShell).
 
 | Step | Agent           | What it does                                                    | Output                                 |
 |------|-----------------|-----------------------------------------------------------------|----------------------------------------|

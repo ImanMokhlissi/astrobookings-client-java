@@ -8,11 +8,12 @@ Improvements that block nothing. Add them here and carry on with the current wor
 
 - `fix-launch-parsing-robustness`: a URL with a query or fragment, fractional numbers in a launch
   and a response that stalls after its headers.
+- `fix-password-input`: in Git Bash, `System.console().readPassword()` returns an empty string. Manual
+  testing found this and the automated tests missed it. The workaround is `winpty java -jar ...` or
+  PowerShell. The spec is not written yet.
 
 ## Improvements
 
-- **Booking specs**: `feat-booking-retrieval` shows `duration` and should accept fractional values
-  when it is built. `BookingActivityResponse` and `LaunchSummary` already hold it as a `BigDecimal`.
 - **ADD**: the system architecture section describes `Main` without saying that it returns the exit
   code, which ADR-7 now states.
 - **`/build`**: it requires the API to respond even for a spec that does not use it.
