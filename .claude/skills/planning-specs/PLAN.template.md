@@ -18,3 +18,9 @@ Covers: {ACn, ACn}
 
 - [ ] `./mvnw compile` passes.
 - [ ] `./mvnw test` passes.
+
+## Verification
+
+<!-- The tester's tasks: plain bullets, not checkboxes, because the tester does not edit the plan. -->
+
+- {What the tester proves, and how.} ({ACn, ACn})
