@@ -13,19 +13,19 @@
 
 ## Solution
 
-- **cli**: Add a booking option to the menu. It shows the launches offered by `service`, asks for a launch and a number of seats, and checks that the seats are a whole number of at least 1. It shows the confirmation using the launch the user chose, because the created booking has no launch data. It shows the capacity and payment errors using the API's message as it is, and states that no booking was created after a 402.
+- **cli**: Add a booking option to the menu. It shows the launches offered by `service` as a numbered list and asks for a launch's number and a number of seats. The user never types a launch id: `cli` resolves the number to the launch in the displayed list. It checks that the launch number is in that list and that the seats are a whole number of at least 1. It shows the confirmation using the launch the user chose, because the created booking has no launch data. It shows the capacity and payment errors using the API's message as it is, and states that no booking was created after a 402.
 - **service**: Add the booking use case. It gets a fresh list of launches, applies the `published` and `confirmed` allow-list before each booking, reads the token from `session` and passes it to `api`. A 401 on this call goes through the rejected-session handling from feat-session.
 - **api**: Add the `POST /bookings` call with the `Authorization: Bearer <token>` header. Translate the launch id to `activityId` and map the 201 response to a Booking. Capacity errors and the 402 map to an API error that carries the status and message, with no parsing of the message.
-- **model**: Add the Booking and LaunchSummary records and the CreateBookingRequest, BookingResponse and BookingActivityResponse DTOs defined in the ADD.
+- **model**: Add the Booking and LaunchSummary records and the CreateBookingRequest, BookingResponse and BookingActivityResponse DTOs defined in the ADD. This spec owns them, and feat-booking-retrieval reuses the Booking and LaunchSummary records and the BookingResponse and BookingActivityResponse DTOs.
 
 ## Acceptance criteria
 
-- **AC1**: WHEN the user with a saved session selects the booking option, the system SHALL fetch the launches from the API and offer only those in status `published` or `confirmed`.
+- **AC1**: WHEN the user with a saved session selects the booking option, the system SHALL fetch the launches from the API and offer only those in status `published` or `confirmed`, as a numbered list.
 - **AC2**: IF the booking use case receives a launch whose status is not `published` or `confirmed`, THEN the system SHALL refuse the booking without sending a request to the API.
-- **AC3**: WHEN the user chooses an offered launch and enters a valid number of seats, the system SHALL send `POST /bookings` with the launch's id as `activityId` and the seats as `participants`.
+- **AC3**: WHEN the user chooses an offered launch by its number in the displayed list and enters a valid number of seats, the system SHALL send `POST /bookings` with that launch's id as `activityId` and the seats as `participants`.
 - **AC4**: WHEN the system sends `POST /bookings`, the system SHALL include the saved token in an `Authorization: Bearer <token>` header.
 - **AC5**: WHEN the API responds 201 to `POST /bookings`, the system SHALL show a confirmation with the booking id, the chosen launch's name, the number of seats and the `paymentStatus`.
-- **AC6**: IF the number of seats entered is not a whole number of at least 1, THEN the system SHALL tell the user that the value is invalid and send no request to the API.
+- **AC6**: IF the launch number entered is not a number in the displayed list, or the number of seats entered is not a whole number of at least 1, THEN the system SHALL tell the user that the value is invalid and send no request to the API.
 - **AC7**: IF the API responds 400 with "Capacity exceeded. Available: N, Requested: M", THEN the system SHALL show that message unchanged, so that the user sees the available and requested numbers.
 - **AC8**: IF the API responds 402 "Payment could not be processed" to `POST /bookings`, THEN the system SHALL show that message and state that no booking was created.
 - **AC9**: IF the user has no saved session when selecting the booking option, THEN the system SHALL tell the user to register or log in and send no booking request to the API.

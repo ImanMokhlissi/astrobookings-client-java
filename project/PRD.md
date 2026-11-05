@@ -44,7 +44,7 @@
 | TR3 | JSON is handled with Jackson, and API fields not listed in the constraints are ignored.           | in-progress |
 | TR4 | The client says "launches" to the user and maps them internally to the API's "activities". Exception: API error messages are shown verbatim, so they may say 'activity' (see ADR-3). | in-progress |
 | TR5 | The token is stored outside the repository in `~/.astrobookings/session.json` and read on startup. | in-progress |
-| TR6 | Booking requests send the token in an `Authorization: Bearer <token>` header.                     | in-progress |
+| TR6 | Requests to protected endpoints (all /bookings calls) send `Authorization: Bearer <token>`.       | in-progress |
 | TR7 | API errors in the format `{message, errors:[{field, message}]}` are shown to the user in a readable form. | in-progress |
 | TR8 | Tests are written with JUnit 5 and run with `./mvnw test`.                                        | in-progress |
 | TR9 | If the API is not running, the client shows `API not reachable at <url>`, with the configured URL, instead of a stack trace. | in-progress |
