@@ -20,6 +20,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -34,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Acceptance criteria of feat-launch-listing, against the real API. AC3 has no test here because
@@ -55,6 +57,9 @@ class LaunchListingE2eTest {
             DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.ENGLISH);
     private static final DateTimeFormatter INSTANT_DISPLAY =
             DateTimeFormatter.ofPattern("MMMM d, yyyy, HH:mm 'UTC'", Locale.ENGLISH).withZone(ZoneOffset.UTC);
+
+    @TempDir
+    static Path temporaryFolder;
 
     @Test
     void AC1_should_show_the_list_and_exit_options_when_the_client_starts() {
@@ -164,7 +169,7 @@ class LaunchListingE2eTest {
 
     @Test
     void AC9_should_show_an_error_and_the_menu_again_when_the_option_is_unknown() {
-        for (String option : List.of("9", "2", "abc", "")) {
+        for (String option : List.of("9", "8", "abc", "")) {
             ClientRun run = runClient(Map.of(VARIABLE, apiUrl()), option + "\n0\n");
 
             assertEquals(0, run.exitCode());
@@ -307,7 +312,8 @@ class LaunchListingE2eTest {
             int exitCode = Main.run(
                     environment,
                     new ByteArrayInputStream(script.getBytes(StandardCharsets.UTF_8)),
-                    new PrintStream(stdout, true, StandardCharsets.UTF_8));
+                    new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                    temporaryFolder.resolve("session.json"));
             return new ClientRun(
                     exitCode, stdout.toString(StandardCharsets.UTF_8), stderr.toString(StandardCharsets.UTF_8));
         } finally {
