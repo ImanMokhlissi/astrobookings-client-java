@@ -41,11 +41,6 @@ public final class Main {
         System.exit(run(System.getenv(), System.in, System.out, realSessionFile(), System.console()));
     }
 
-    /** Uses the real session file. It stays only until the end-to-end tests use a temporary one. */
-    static int run(Map<String, String> environment, InputStream input, PrintStream output) {
-        return run(environment, input, output, realSessionFile());
-    }
-
     static int run(Map<String, String> environment, InputStream input, PrintStream output, Path sessionFile) {
         return run(environment, input, output, sessionFile, null);
     }
