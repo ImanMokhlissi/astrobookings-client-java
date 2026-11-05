@@ -20,7 +20,7 @@ description: Generates a feature, fix or chore specification in project/specs/ f
    final message instead.
 
 4. Fill in [spec.template.md](spec.template.md). Replace every `{placeholder}` and remove the
-   template's instructions. Write the acceptance criteria following [EARS.md](EARS.md). Do not
+   template's instructions. Write at most 12 acceptance criteria following [EARS.md](EARS.md). Do not
    add requirements that the PRD and the ADD do not support.
 
 5. Save the result to `project/specs/<type>-<slug>.spec.md`. A new spec starts as `draft`.
