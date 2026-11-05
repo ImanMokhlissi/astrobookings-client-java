@@ -18,6 +18,7 @@ import dev.iman.astrobookings.model.LoginRequest;
 import dev.iman.astrobookings.model.RegisterRequest;
 import dev.iman.astrobookings.model.Session;
 import dev.iman.astrobookings.model.UnauthorizedFailure;
+import dev.iman.astrobookings.model.User;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -176,7 +177,7 @@ public final class ApiClient {
 
     private Session toSession(HttpResponse<String> response) {
         return readAuthResponse(response.body())
-                .map(auth -> new Session(auth.accessToken(), auth.user().username(), auth.user().email()))
+                .map(ApiClient::toSession)
                 .orElseThrow(() -> new ApiErrorFailure(genericError(response.statusCode())));
     }
 
@@ -190,11 +191,16 @@ public final class ApiClient {
         }
     }
 
-    private static boolean isComplete(AuthResponse auth) {
-        return auth.user() != null
-                && hasText(auth.accessToken())
-                && hasText(auth.user().username())
-                && hasText(auth.user().email());
+    private static boolean isComplete(AuthResponse authResponse) {
+        return authResponse.user() != null
+                && hasText(authResponse.accessToken())
+                && hasText(authResponse.user().username())
+                && hasText(authResponse.user().email());
+    }
+
+    private static Session toSession(AuthResponse authResponse) {
+        User user = authResponse.user();
+        return new Session(authResponse.accessToken(), user.username(), user.email());
     }
 
     private static boolean hasText(String value) {
@@ -215,8 +221,7 @@ public final class ApiClient {
 
     private static boolean isWellFormed(ErrorResponse error) {
         return error != null
-                && error.message() != null
-                && !error.message().isBlank()
+                && hasText(error.message())
                 && (error.errors() == null || error.errors().stream().allMatch(ApiClient::isWellFormed));
     }
 
