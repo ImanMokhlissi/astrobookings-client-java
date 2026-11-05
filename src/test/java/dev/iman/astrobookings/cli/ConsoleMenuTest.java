@@ -9,9 +9,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.iman.astrobookings.FakeApiServer;
 import dev.iman.astrobookings.api.ApiClient;
 import dev.iman.astrobookings.model.ApiError;
+import dev.iman.astrobookings.model.ApiFailure;
+import dev.iman.astrobookings.model.LaunchNotBookableFailure;
+import dev.iman.astrobookings.model.NoSessionFailure;
 import dev.iman.astrobookings.model.Session;
 import dev.iman.astrobookings.model.SessionRejectedFailure;
 import dev.iman.astrobookings.model.UnauthorizedFailure;
+import dev.iman.astrobookings.service.BookingService;
 import dev.iman.astrobookings.service.LaunchService;
 import dev.iman.astrobookings.service.SessionService;
 import dev.iman.astrobookings.session.SessionStore;
@@ -20,6 +24,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.math.BigInteger;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -70,6 +75,20 @@ class ConsoleMenuTest {
     private static final String SESSION_NOT_SAVED_LINE = "The session could not be saved.";
     private static final String CREDENTIALS_REJECTED_LINE = "The email or password was not accepted.";
     private static final String SESSION_REJECTED_LINE = "Your session is no longer valid. Please register again.";
+    private static final String BOOK_OPTION_LINE = "5. Book seats";
+    private static final String LAUNCH_PROMPT = "Launch number (0 to cancel):";
+    private static final String SEATS_PROMPT = "Seats (0 to cancel):";
+    private static final String NO_SESSION_LINE = "Register or log in first.";
+    private static final String NO_BOOKING_LINE = "No booking was created.";
+    private static final String GENERIC_ERROR_LINE = "The API returned an unexpected response.";
+    private static final String CAPACITY_LINE = "Capacity exceeded. Available: 2, Requested: 3";
+    private static final String CAPACITY_BODY = "{\"message\":\"" + CAPACITY_LINE + "\",\"errors\":[]}";
+    private static final String TWO_OPEN_LAUNCHES =
+            FakeApiServer.activityJson("Moon", "published") + "," + FakeApiServer.activityJson("Mars", "confirmed");
+    private static final String BOOKING_BODY = """
+            {"id":"booking-1","activityId":"id-Mars","userId":"user-1","participants":2,
+             "createdAt":"2026-11-05T10:00:00.000Z","paymentId":"payment-1","paymentStatus":"paid"}
+            """;
     private static final ObjectMapper JSON = new ObjectMapper();
 
     @TempDir
@@ -284,13 +303,10 @@ class ConsoleMenuTest {
 
     @Test
     void should_ask_to_register_again_when_the_session_is_rejected() {
-        ByteArrayOutputStream captured = new ByteArrayOutputStream();
-        ConsoleMenu menu = new ConsoleMenu(launchService(), sessionService(), scriptOf(""), printStreamOver(captured));
         UnauthorizedFailure unauthorized = new UnauthorizedFailure(new ApiError(401, "Unauthorized", List.of()));
 
-        menu.showFailure(new SessionRejectedFailure(unauthorized));
+        List<String> lines = linesShownFor(new SessionRejectedFailure(unauthorized));
 
-        List<String> lines = captured.toString(StandardCharsets.UTF_8).lines().toList();
         assertEquals(List.of(SESSION_REJECTED_LINE), lines);
     }
 
@@ -638,6 +654,357 @@ class ConsoleMenuTest {
         assertEquals(2, timesMenuShown(lines));
     }
 
+    @Test
+    void should_show_the_option_to_book_seats_when_started() {
+        List<String> lines = runMenu("0\n");
+
+        assertTrue(lines.contains(BOOK_OPTION_LINE));
+    }
+
+    @Test
+    void should_tell_the_user_to_register_or_log_in_without_calling_the_api_when_booking_with_no_session() {
+        List<String> lines = runMenu("5\n0\n");
+
+        assertEquals(0, fakeApi.receivedRequests());
+        assertFalse(lines.contains(LAUNCH_PROMPT));
+        assertShownThenMenuAgain(lines, NO_SESSION_LINE);
+    }
+
+    @Test
+    void should_ask_to_register_or_log_in_when_there_is_no_session() {
+        assertEquals(List.of(NO_SESSION_LINE), linesShownFor(new NoSessionFailure()));
+    }
+
+    @Test
+    void should_say_the_launch_is_not_open_when_the_booking_is_refused() {
+        assertEquals(List.of("This launch is not open for booking."), linesShownFor(new LaunchNotBookableFailure()));
+    }
+
+    @Test
+    void should_number_only_the_open_launches_from_1_when_booking() {
+        startSession();
+        fakeApi.respondWith(200, "[" + FakeApiServer.activityJson("Venus", "draft") + "," + TWO_OPEN_LAUNCHES + "]");
+
+        List<String> lines = runMenu("5\n0\n0\n");
+
+        assertTrue(lines.contains("1. Moon - December 20, 2026 - Price: 158"));
+        assertTrue(lines.contains("2. Mars - December 20, 2026 - Price: 158"));
+        assertFalse(String.join("\n", lines).contains("Venus"));
+    }
+
+    @Test
+    void should_show_the_exact_message_and_ask_for_nothing_when_no_launch_is_open_for_booking() {
+        startSession();
+        fakeApi.respondWith(200, "[" + FakeApiServer.activityJson("Venus", "draft") + "]");
+
+        List<String> lines = runMenu("5\n0\n");
+
+        assertFalse(lines.contains(LAUNCH_PROMPT));
+        assertShownThenMenuAgain(lines, "No launches open for booking.");
+    }
+
+    @Test
+    void should_show_not_reachable_and_the_menu_again_when_booking_with_the_api_down() {
+        startSession();
+        fakeApi.stop();
+
+        List<String> lines = runMenu("5\n0\n");
+
+        assertShownThenMenuAgain(lines, "API not reachable at " + fakeApi.url());
+    }
+
+    @Test
+    void should_say_that_0_cancels_when_asking_for_the_launch_number() {
+        startSession();
+        respondWithOpenLaunches();
+
+        List<String> lines = runMenu("5\n0\n0\n");
+
+        assertTrue(lines.contains("Launch number (0 to cancel):"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "00"})
+    void should_cancel_without_a_booking_request_when_the_launch_number_is_0(String entry) {
+        startSession();
+        respondWithOpenLaunches();
+
+        List<String> lines = runMenu("5\n" + entry + "\n0\n");
+
+        assertEquals(1, fakeApi.receivedRequests());
+        assertFalse(lines.contains(SEATS_PROMPT));
+        assertEquals(2, timesMenuShown(lines));
+    }
+
+    @Test
+    void should_fetch_a_fresh_list_each_time_the_booking_option_is_selected() {
+        startSession();
+        fakeApi.queueResponse(200, "[" + FakeApiServer.activityJson("Moon", "published") + "]");
+        fakeApi.queueResponse(200, "[" + FakeApiServer.activityJson("Mars", "published") + "]");
+
+        List<String> lines = runMenu("5\n0\n5\n0\n0\n");
+
+        assertEquals(2, fakeApi.receivedRequests());
+        assertTrue(lines.contains("1. Mars - December 20, 2026 - Price: 158"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"3", "-1", "abc", "1.5", "", "+1", "١", "99999999999999999999"})
+    void should_ask_again_without_a_request_when_the_launch_number_is_invalid(String entry) {
+        startSession();
+        respondWithOpenLaunches();
+
+        List<String> lines = runMenu("5\n" + entry + "\n0\n0\n");
+
+        assertEquals(1, fakeApi.receivedRequests());
+        assertEquals(2, timesShown(lines, LAUNCH_PROMPT));
+        assertTrue(lines.contains("Enter a launch number from the list."));
+        assertFalse(String.join("\n", lines).contains("Exception"));
+    }
+
+    @Test
+    void should_choose_the_launch_by_value_when_the_number_has_leading_zeros() throws IOException {
+        startSession();
+        respondWithOpenLaunchesThenBooking();
+
+        runMenu("5\n02\n2\n0\n");
+
+        assertEquals("id-Mars", bodyOfRequest(1).get("activityId").asText());
+    }
+
+    @Test
+    void should_end_without_a_booking_request_when_the_input_ends_at_the_launch_number_prompt() {
+        startSession();
+        respondWithOpenLaunches();
+
+        List<String> lines = runMenu("5\n");
+
+        assertEquals(1, fakeApi.receivedRequests());
+        assertEquals(2, timesMenuShown(lines));
+    }
+
+    @Test
+    void should_send_the_chosen_launch_id_and_the_seats_when_booking() throws IOException {
+        startSession();
+        respondWithOpenLaunchesThenBooking();
+
+        runMenu("5\n2\n2\n0\n");
+
+        assertEquals("POST", fakeApi.receivedMethod());
+        assertEquals("/bookings", fakeApi.receivedPath());
+        assertEquals("Bearer token-1", fakeApi.receivedAuthorization());
+        assertEquals(JSON.readTree("{\"activityId\":\"id-Mars\",\"participants\":2}"), bodyOfRequest(1));
+    }
+
+    @Test
+    void should_show_the_id_launch_name_seats_and_payment_status_when_the_booking_is_created() {
+        startSession();
+        respondWithOpenLaunchesThenBooking();
+
+        List<String> lines = runMenu("5\n2\n2\n0\n");
+
+        assertTrue(lines.containsAll(List.of(
+                "Booking created.", "Booking id: booking-1", "Launch: Mars", "Seats: 2", "Payment status: paid")));
+        assertShownThenMenuAgain(lines, "Payment status: paid");
+    }
+
+    @Test
+    void should_say_that_0_cancels_when_asking_for_the_seats() {
+        startSession();
+        respondWithOpenLaunches();
+
+        List<String> lines = runMenu("5\n1\n0\n0\n");
+
+        assertTrue(lines.contains("Seats (0 to cancel):"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "00"})
+    void should_cancel_without_a_booking_request_when_the_seats_are_0(String entry) {
+        startSession();
+        respondWithOpenLaunches();
+
+        List<String> lines = runMenu("5\n1\n" + entry + "\n0\n");
+
+        assertEquals(1, fakeApi.receivedRequests());
+        assertEquals(2, timesMenuShown(lines));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"-1", "abc", "1.5", "+1", "", "١"})
+    void should_ask_again_without_a_request_when_the_seats_are_invalid(String entry) {
+        startSession();
+        respondWithOpenLaunches();
+
+        List<String> lines = runMenu("5\n1\n" + entry + "\n0\n0\n");
+
+        assertEquals(1, fakeApi.receivedRequests());
+        assertEquals(2, timesShown(lines, SEATS_PROMPT));
+        assertEquals(1, timesShown(lines, LAUNCH_PROMPT));
+        assertTrue(lines.contains("The seats must be a whole number of at least 1."));
+    }
+
+    @Test
+    void should_send_the_seats_when_they_are_too_long_for_an_int() throws IOException {
+        startSession();
+        fakeApi.queueResponse(200, "[" + TWO_OPEN_LAUNCHES + "]");
+        fakeApi.respondWith(400, CAPACITY_BODY);
+
+        List<String> lines = runMenu("5\n1\n99999999999999999999\n0\n");
+
+        assertEquals(new BigInteger("99999999999999999999"), bodyOfRequest(1).get("participants").bigIntegerValue());
+        assertShownThenMenuAgain(lines, CAPACITY_LINE);
+    }
+
+    @Test
+    void should_send_the_seats_by_value_when_they_have_leading_zeros() throws IOException {
+        startSession();
+        respondWithOpenLaunchesThenBooking();
+
+        runMenu("5\n1\n03\n0\n");
+
+        assertEquals(3, bodyOfRequest(1).get("participants").intValue());
+    }
+
+    @Test
+    void should_end_without_a_booking_request_when_the_input_ends_at_the_seats_prompt() {
+        startSession();
+        respondWithOpenLaunches();
+
+        List<String> lines = runMenu("5\n1\n");
+
+        assertEquals(1, fakeApi.receivedRequests());
+        assertEquals(2, timesMenuShown(lines));
+    }
+
+    @Test
+    void should_not_say_activity_when_showing_the_booking_texts() {
+        startSession();
+        respondWithOpenLaunchesThenBooking();
+
+        List<String> lines = runMenu("5\n9\n1\nabc\n2\n0\n");
+
+        assertTrue(lines.contains("Booking created."));
+        assertFalse(sayActivity(lines));
+    }
+
+    @Test
+    void should_show_the_capacity_message_unchanged_and_the_menu_again_when_the_capacity_is_exceeded() {
+        startSession();
+        fakeApi.queueResponse(200, "[" + TWO_OPEN_LAUNCHES + "]");
+        fakeApi.respondWith(400, CAPACITY_BODY);
+
+        List<String> lines = runMenu("5\n1\n3\n0\n");
+
+        assertShownThenMenuAgain(lines, CAPACITY_LINE);
+        assertFalse(lines.contains(NO_BOOKING_LINE));
+    }
+
+    @Test
+    void should_show_the_message_and_say_no_booking_was_created_when_the_payment_is_rejected() {
+        startSession();
+        fakeApi.queueResponse(200, "[" + TWO_OPEN_LAUNCHES + "]");
+        fakeApi.respondWith(402, "{\"message\":\"Payment could not be processed\",\"errors\":[]}");
+
+        List<String> lines = runMenu("5\n1\n2\n0\n");
+
+        assertTrue(lines.indexOf("Payment could not be processed") < lines.indexOf(NO_BOOKING_LINE));
+        assertTrue(lines.contains("Payment could not be processed"));
+        assertShownThenMenuAgain(lines, NO_BOOKING_LINE);
+    }
+
+    @Test
+    void should_say_no_booking_was_created_when_the_402_body_is_not_valid_json() {
+        startSession();
+        fakeApi.queueResponse(200, "[" + TWO_OPEN_LAUNCHES + "]");
+        fakeApi.respondWith(402, "<html>");
+
+        List<String> lines = runMenu("5\n1\n2\n0\n");
+
+        assertTrue(lines.contains(GENERIC_ERROR_LINE));
+        assertShownThenMenuAgain(lines, NO_BOOKING_LINE);
+    }
+
+    @Test
+    void should_show_the_message_verbatim_when_booking_on_a_launch_the_api_cannot_find() {
+        startSession();
+        fakeApi.queueResponse(200, "[" + TWO_OPEN_LAUNCHES + "]");
+        fakeApi.respondWith(404, "{\"message\":\"Activity not found\",\"errors\":[]}");
+
+        List<String> lines = runMenu("5\n1\n2\n0\n");
+
+        assertShownThenMenuAgain(lines, "Activity not found");
+        assertFalse(lines.contains(NO_BOOKING_LINE));
+    }
+
+    @Test
+    void should_delete_the_file_and_ask_to_register_again_when_booking_responds_401() {
+        startSession();
+        fakeApi.queueResponse(200, "[" + TWO_OPEN_LAUNCHES + "]");
+        fakeApi.respondWith(401, "{\"message\":\"Unauthorized\",\"errors\":[]}");
+
+        List<String> lines = runMenu("5\n1\n2\n0\n");
+
+        assertFalse(Files.exists(sessionFile));
+        assertFalse(lines.contains("Unauthorized"));
+        assertShownThenMenuAgain(lines, SESSION_REJECTED_LINE);
+    }
+
+    @Test
+    void should_ask_to_register_or_log_in_when_booking_again_after_a_rejected_session() {
+        startSession();
+        fakeApi.queueResponse(200, "[" + TWO_OPEN_LAUNCHES + "]");
+        fakeApi.respondWith(401, "{\"message\":\"Unauthorized\",\"errors\":[]}");
+
+        List<String> lines = runMenu("5\n1\n2\n5\n0\n");
+
+        assertEquals(2, fakeApi.receivedRequests());
+        assertTrue(lines.indexOf(SESSION_REJECTED_LINE) < lines.indexOf(NO_SESSION_LINE));
+        assertEquals(3, timesMenuShown(lines));
+    }
+
+    @Test
+    void should_show_a_generic_error_and_the_menu_again_when_the_booking_response_is_malformed() {
+        startSession();
+        fakeApi.queueResponse(200, "[" + TWO_OPEN_LAUNCHES + "]");
+        fakeApi.respondWith(201, "{\"id\":\"booking-1\"}");
+
+        List<String> lines = runMenu("5\n1\n2\n0\n");
+
+        assertFalse(lines.contains("Booking created."));
+        assertShownThenMenuAgain(lines, GENERIC_ERROR_LINE);
+    }
+
+    private void startSession() {
+        new SessionStore(sessionFile).write(ANA);
+    }
+
+    private void respondWithOpenLaunches() {
+        fakeApi.respondWith(200, "[" + TWO_OPEN_LAUNCHES + "]");
+    }
+
+    private void respondWithOpenLaunchesThenBooking() {
+        fakeApi.queueResponse(200, "[" + TWO_OPEN_LAUNCHES + "]");
+        fakeApi.respondWith(201, BOOKING_BODY);
+    }
+
+    private List<String> linesShownFor(ApiFailure failure) {
+        ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        ApiClient apiClient = new ApiClient(HttpClient.newHttpClient(), fakeApi.url(), TIMEOUT);
+        SessionService sessionService = new SessionService(apiClient, new SessionStore(sessionFile));
+        LaunchService launchService = new LaunchService(apiClient);
+        BookingService bookingService = new BookingService(apiClient, launchService, sessionService);
+
+        new ConsoleMenu(launchService, sessionService, bookingService, scriptOf(""), printStreamOver(captured))
+                .showFailure(failure);
+
+        return captured.toString(StandardCharsets.UTF_8).lines().toList();
+    }
+
+    private static long timesShown(List<String> lines, String expectedLine) {
+        return lines.stream().filter(expectedLine::equals).count();
+    }
+
     private JsonNode bodyOfRequest(int index) throws IOException {
         return JSON.readTree(fakeApi.receivedBodies().get(index));
     }
@@ -681,28 +1048,31 @@ class ConsoleMenuTest {
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
         ApiClient apiClient = new ApiClient(HttpClient.newHttpClient(), fakeApi.url(), timeout);
         SessionService sessionService = new SessionService(apiClient, new SessionStore(sessionFile));
+        LaunchService launchService = new LaunchService(apiClient);
+        BookingService bookingService = new BookingService(apiClient, launchService, sessionService);
 
-        new ConsoleMenu(new LaunchService(apiClient), sessionService, input, printStreamOver(captured)).run();
+        new ConsoleMenu(launchService, sessionService, bookingService, input, printStreamOver(captured)).run();
 
         return captured.toString(StandardCharsets.UTF_8).lines().toList();
     }
 
     private List<String> runMenu(String script, PasswordPrompt passwordPrompt) {
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        ApiClient apiClient = new ApiClient(HttpClient.newHttpClient(), fakeApi.url(), TIMEOUT);
+        SessionService sessionService = new SessionService(apiClient, new SessionStore(sessionFile));
+        LaunchService launchService = new LaunchService(apiClient);
+        BookingService bookingService = new BookingService(apiClient, launchService, sessionService);
 
-        new ConsoleMenu(launchService(), sessionService(), scriptOf(script), printStreamOver(captured), passwordPrompt)
+        new ConsoleMenu(
+                        launchService,
+                        sessionService,
+                        bookingService,
+                        scriptOf(script),
+                        printStreamOver(captured),
+                        passwordPrompt)
                 .run();
 
         return captured.toString(StandardCharsets.UTF_8).lines().toList();
-    }
-
-    private LaunchService launchService() {
-        return new LaunchService(new ApiClient(HttpClient.newHttpClient(), fakeApi.url(), TIMEOUT));
-    }
-
-    private SessionService sessionService() {
-        ApiClient apiClient = new ApiClient(HttpClient.newHttpClient(), fakeApi.url(), TIMEOUT);
-        return new SessionService(apiClient, new SessionStore(sessionFile));
     }
 
     private static PrintStream printStreamOver(ByteArrayOutputStream captured) {
