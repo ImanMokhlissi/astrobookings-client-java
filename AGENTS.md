@@ -4,7 +4,8 @@
 
 Java console client for AstroBookings, a fictional space travel company.
 Customers list rocket launches, register, book seats and check their bookings.
-It consumes the existing activity-bookings-express REST API at http://localhost:3000.
+It consumes the existing activity-bookings-express REST API, at the URL in
+`ASTROBOOKINGS_API_URL` (default http://localhost:3000).
 The client says "launches"; the API says "activities". Read `project/briefing.md` for the
 API constraints before working on any feature.
 
@@ -25,6 +26,9 @@ API constraints before working on any feature.
 
 # Run the tests
 ./mvnw test
+
+# Run the end-to-end tests (needs the API running)
+./mvnw test -Pe2e
 
 # Run the client (needs the API running)
 ./mvnw compile exec:java -Dexec.mainClass=dev.iman.astrobookings.Main
@@ -54,6 +58,7 @@ cd ../activity-bookings-express && npm run dev
 
 - `.claude/`: agent tooling, reusable across projects.
 - `project/`: documentation specific to this project.
+- `src/main/java/dev/iman/astrobookings/`: packages `cli`, `service`, `api`, `model`, `session`.
 
 ## Environment
 
