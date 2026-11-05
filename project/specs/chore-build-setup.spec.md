@@ -1,7 +1,7 @@
 # Build setup
 
 - **Type**: chore
-- **Status**: in-progress
+- **Status**: verified
 - **Related**: TR1, TR3, TR8
 - **Depends on**: none
 
