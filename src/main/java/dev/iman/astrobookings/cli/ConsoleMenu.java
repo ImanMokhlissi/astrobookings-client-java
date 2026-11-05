@@ -6,10 +6,13 @@ import dev.iman.astrobookings.model.ApiFailure;
 import dev.iman.astrobookings.model.ApiNotReachableFailure;
 import dev.iman.astrobookings.model.InvalidCredentialsFailure;
 import dev.iman.astrobookings.model.Launch;
+import dev.iman.astrobookings.model.LaunchNotBookableFailure;
+import dev.iman.astrobookings.model.NoSessionFailure;
 import dev.iman.astrobookings.model.Session;
 import dev.iman.astrobookings.model.SessionFileFailure;
 import dev.iman.astrobookings.model.SessionRejectedFailure;
 import dev.iman.astrobookings.model.UnauthorizedFailure;
+import dev.iman.astrobookings.service.BookingService;
 import dev.iman.astrobookings.service.LaunchService;
 import dev.iman.astrobookings.service.SessionService;
 import java.io.BufferedReader;
@@ -26,10 +29,13 @@ import java.util.Set;
 /** The interactive menu. It runs until the user exits or the input ends. */
 public final class ConsoleMenu {
 
+    static final String NO_OPEN_LAUNCHES_MESSAGE = "No launches open for booking.";
+
     private static final String LIST_LAUNCHES_OPTION = "1";
     private static final String REGISTER_OPTION = "2";
     private static final String LOG_IN_OPTION = "3";
     private static final String LOG_OUT_OPTION = "4";
+    private static final String BOOK_SEATS_OPTION = "5";
     private static final String EXIT_OPTION = "0";
     private static final String EMAIL_FIELD = "email";
     private static final String EMAIL_PROMPT = "Email:";
@@ -41,20 +47,27 @@ public final class ConsoleMenu {
     private final BufferedReader input;
     private final PrintStream output;
     private final PasswordPrompt passwordPrompt;
+    private final BookingFlow bookingFlow;
 
     /** Reads passwords from the injected input, for when there is no console. */
     public ConsoleMenu(
-            LaunchService launchService, SessionService sessionService, InputStream input, PrintStream output) {
+            LaunchService launchService,
+            SessionService sessionService,
+            BookingService bookingService,
+            InputStream input,
+            PrintStream output) {
         this.launchService = launchService;
         this.sessionService = sessionService;
         this.input = readerOver(input);
         this.output = output;
         this.passwordPrompt = this::readPasswordFromInput;
+        this.bookingFlow = new BookingFlow(bookingService, this::promptFor, output, this::showFailure);
     }
 
     public ConsoleMenu(
             LaunchService launchService,
             SessionService sessionService,
+            BookingService bookingService,
             InputStream input,
             PrintStream output,
             PasswordPrompt passwordPrompt) {
@@ -63,6 +76,7 @@ public final class ConsoleMenu {
         this.input = readerOver(input);
         this.output = output;
         this.passwordPrompt = passwordPrompt;
+        this.bookingFlow = new BookingFlow(bookingService, this::promptFor, output, this::showFailure);
     }
 
     private static BufferedReader readerOver(InputStream input) {
@@ -97,6 +111,7 @@ public final class ConsoleMenu {
         output.println(REGISTER_OPTION + ". Register");
         output.println(LOG_IN_OPTION + ". Log in");
         output.println(LOG_OUT_OPTION + ". Log out");
+        output.println(BOOK_SEATS_OPTION + ". Book seats");
         output.println(EXIT_OPTION + ". Exit");
         output.println("Select an option:");
     }
@@ -139,6 +154,7 @@ public final class ConsoleMenu {
             case REGISTER_OPTION -> register();
             case LOG_IN_OPTION -> logIn();
             case LOG_OUT_OPTION -> logOut();
+            case BOOK_SEATS_OPTION -> bookingFlow.run();
             default -> output.println("Unknown option. Select one of the options in the menu.");
         }
     }
@@ -153,7 +169,7 @@ public final class ConsoleMenu {
 
     private void showLaunches(List<Launch> launches) {
         if (launches.isEmpty()) {
-            output.println("No launches open for booking.");
+            output.println(NO_OPEN_LAUNCHES_MESSAGE);
             return;
         }
         launches.forEach(this::showLaunch);
@@ -267,6 +283,9 @@ public final class ConsoleMenu {
                     output.println("The email or password was not accepted.");
             case SessionRejectedFailure sessionRejected ->
                     output.println("Your session is no longer valid. Please register again.");
+            case NoSessionFailure noSession -> output.println("Register or log in first.");
+            case LaunchNotBookableFailure notBookable ->
+                    output.println("This launch is not open for booking.");
         }
     }
 

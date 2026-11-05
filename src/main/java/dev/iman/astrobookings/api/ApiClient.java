@@ -10,16 +10,22 @@ import dev.iman.astrobookings.model.ApiErrorFailure;
 import dev.iman.astrobookings.model.ApiFailure;
 import dev.iman.astrobookings.model.ApiNotReachableFailure;
 import dev.iman.astrobookings.model.AuthResponse;
+import dev.iman.astrobookings.model.Booking;
+import dev.iman.astrobookings.model.BookingActivityResponse;
+import dev.iman.astrobookings.model.BookingResponse;
+import dev.iman.astrobookings.model.CreateBookingRequest;
 import dev.iman.astrobookings.model.ErrorResponse;
 import dev.iman.astrobookings.model.FieldError;
 import dev.iman.astrobookings.model.FieldErrorResponse;
 import dev.iman.astrobookings.model.Launch;
+import dev.iman.astrobookings.model.LaunchSummary;
 import dev.iman.astrobookings.model.LoginRequest;
 import dev.iman.astrobookings.model.RegisterRequest;
 import dev.iman.astrobookings.model.Session;
 import dev.iman.astrobookings.model.UnauthorizedFailure;
 import dev.iman.astrobookings.model.User;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -28,6 +34,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 /** The HTTP boundary: every failure leaves this class as an {@link ApiFailure}. */
@@ -36,6 +43,7 @@ public final class ApiClient {
     private static final String ACTIVITIES_PATH = "/activities";
     private static final String USERS_PATH = "/users";
     private static final String LOGIN_PATH = "/login";
+    private static final String BOOKINGS_PATH = "/bookings";
     private static final String GENERIC_ERROR_MESSAGE = "The API returned an unexpected response.";
     private static final int NO_RESPONSE_STATUS = 0;
     private static final int UNAUTHORIZED_STATUS = 401;
@@ -70,6 +78,13 @@ public final class ApiClient {
         return authenticate(LOGIN_PATH, new LoginRequest(email, password));
     }
 
+    public Booking createBooking(String token, String launchId, BigInteger seats) {
+        String json = toJson(new CreateBookingRequest(launchId, seats));
+        HttpResponse<String> response = send(buildAuthenticatedPostRequest(BOOKINGS_PATH, json, token));
+        throwIfFailed(response);
+        return toBooking(response);
+    }
+
     private Session authenticate(String path, Object requestBody) {
         HttpResponse<String> response = send(buildPostRequest(path, toJson(requestBody)));
         throwIfFailed(response);
@@ -81,11 +96,24 @@ public final class ApiClient {
     }
 
     private HttpRequest buildPostRequest(String path, String json) {
+        return postRequestBuilder(path, json).build();
+    }
+
+    /** A token that a header cannot hold, such as one with a control character, is a generic error. */
+    private HttpRequest buildAuthenticatedPostRequest(String path, String json, String token) {
+        HttpRequest.Builder builder = postRequestBuilder(path, json);
+        try {
+            return builder.header("Authorization", "Bearer " + token).build();
+        } catch (IllegalArgumentException e) {
+            throw new ApiErrorFailure(genericError(NO_RESPONSE_STATUS));
+        }
+    }
+
+    private HttpRequest.Builder postRequestBuilder(String path, String json) {
         return HttpRequest.newBuilder(urlOf(path))
                 .timeout(requestTimeout)
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(json))
-                .build();
+                .POST(HttpRequest.BodyPublishers.ofString(json));
     }
 
     private String toJson(Object requestBody) {
@@ -129,25 +157,15 @@ public final class ApiClient {
     }
 
     private List<Launch> toLaunches(HttpResponse<String> response) {
-        return readActivities(response.body())
-                .map(activities -> activities.stream().map(ApiClient::toLaunch).toList())
-                .orElseThrow(() -> new ApiErrorFailure(genericError(response.statusCode())));
+        List<ActivityResponse> activities = readComplete(
+                response,
+                new TypeReference<List<ActivityResponse>>() {},
+                list -> list.stream().allMatch(ApiClient::isComplete));
+        return activities.stream().map(ApiClient::toLaunch).toList();
     }
 
-    /** An empty result means that the body is not a list of complete activities. */
-    private Optional<List<ActivityResponse>> readActivities(String body) {
-        try {
-            List<ActivityResponse> activities =
-                    mapper.readValue(body, new TypeReference<List<ActivityResponse>>() {});
-            return Optional.ofNullable(activities)
-                    .filter(list -> list.stream().noneMatch(ApiClient::isIncomplete));
-        } catch (JsonProcessingException e) {
-            return Optional.empty();
-        }
-    }
-
-    private static boolean isIncomplete(ActivityResponse activity) {
-        return activity == null || Stream.<Object>of(
+    private static boolean isComplete(ActivityResponse activity) {
+        return activity != null && noneIsNull(
                 activity.id(),
                 activity.name(),
                 activity.slug(),
@@ -157,8 +175,7 @@ public final class ApiClient {
                 activity.location(),
                 activity.minParticipants(),
                 activity.maxParticipants(),
-                activity.status())
-                .anyMatch(Objects::isNull);
+                activity.status());
     }
 
     private static Launch toLaunch(ActivityResponse activity) {
@@ -176,19 +193,7 @@ public final class ApiClient {
     }
 
     private Session toSession(HttpResponse<String> response) {
-        return readAuthResponse(response.body())
-                .map(ApiClient::toSession)
-                .orElseThrow(() -> new ApiErrorFailure(genericError(response.statusCode())));
-    }
-
-    /** An empty result means that the body is not a complete authentication response. */
-    private Optional<AuthResponse> readAuthResponse(String body) {
-        try {
-            return Optional.ofNullable(mapper.readValue(body, AuthResponse.class))
-                    .filter(ApiClient::isComplete);
-        } catch (JsonProcessingException e) {
-            return Optional.empty();
-        }
+        return toSession(readComplete(response, new TypeReference<AuthResponse>() {}, ApiClient::isComplete));
     }
 
     private static boolean isComplete(AuthResponse authResponse) {
@@ -203,25 +208,88 @@ public final class ApiClient {
         return new Session(authResponse.accessToken(), user.username(), user.email());
     }
 
+    private Booking toBooking(HttpResponse<String> response) {
+        return toBooking(readComplete(response, new TypeReference<BookingResponse>() {}, ApiClient::isComplete));
+    }
+
+    private static boolean isComplete(BookingResponse booking) {
+        return hasText(booking.id())
+                && hasText(booking.activityId())
+                && hasText(booking.userId())
+                && booking.participants() != null
+                && hasText(booking.createdAt())
+                && hasText(booking.paymentStatus())
+                && (booking.activity() == null || isComplete(booking.activity()));
+    }
+
+    private static boolean isComplete(BookingActivityResponse activity) {
+        return noneIsNull(
+                activity.name(),
+                activity.slug(),
+                activity.price(),
+                activity.date(),
+                activity.duration(),
+                activity.location(),
+                activity.status());
+    }
+
+    private static Booking toBooking(BookingResponse booking) {
+        return new Booking(
+                booking.id(),
+                booking.activityId(),
+                booking.userId(),
+                booking.participants(),
+                booking.createdAt(),
+                booking.paymentId(),
+                booking.paymentStatus(),
+                booking.activity() == null ? null : toLaunchSummary(booking.activity()));
+    }
+
+    private static LaunchSummary toLaunchSummary(BookingActivityResponse activity) {
+        return new LaunchSummary(
+                activity.name(),
+                activity.slug(),
+                activity.price(),
+                activity.date(),
+                activity.duration(),
+                activity.location(),
+                activity.status());
+    }
+
     private static boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
 
-    private ApiError toApiError(int status, String body) {
+    private static boolean noneIsNull(Object... values) {
+        return Stream.of(values).noneMatch(Objects::isNull);
+    }
+
+    /** A 2xx body that cannot be read or is not complete becomes a generic error. */
+    private <T> T readComplete(
+            HttpResponse<String> response, TypeReference<T> bodyType, Predicate<T> isComplete) {
+        return readJson(response.body(), bodyType)
+                .filter(isComplete)
+                .orElseThrow(() -> new ApiErrorFailure(genericError(response.statusCode())));
+    }
+
+    /** An empty result means that the body is not valid JSON of this type, or is the literal null. */
+    private <T> Optional<T> readJson(String body, TypeReference<T> bodyType) {
         try {
-            ErrorResponse error = mapper.readValue(body, ErrorResponse.class);
-            if (!isWellFormed(error)) {
-                return genericError(status);
-            }
-            return new ApiError(status, error.message(), toFieldErrors(error.errors()));
+            return Optional.ofNullable(mapper.readValue(body, bodyType));
         } catch (JsonProcessingException e) {
-            return genericError(status);
+            return Optional.empty();
         }
     }
 
+    private ApiError toApiError(int status, String body) {
+        return readJson(body, new TypeReference<ErrorResponse>() {})
+                .filter(ApiClient::isWellFormed)
+                .map(error -> new ApiError(status, error.message(), toFieldErrors(error.errors())))
+                .orElseGet(() -> genericError(status));
+    }
+
     private static boolean isWellFormed(ErrorResponse error) {
-        return error != null
-                && hasText(error.message())
+        return hasText(error.message())
                 && (error.errors() == null || error.errors().stream().allMatch(ApiClient::isWellFormed));
     }
 

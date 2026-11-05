@@ -10,12 +10,15 @@ import dev.iman.astrobookings.FakeApiServer;
 import dev.iman.astrobookings.model.ApiError;
 import dev.iman.astrobookings.model.ApiErrorFailure;
 import dev.iman.astrobookings.model.ApiNotReachableFailure;
+import dev.iman.astrobookings.model.Booking;
 import dev.iman.astrobookings.model.FieldError;
 import dev.iman.astrobookings.model.Launch;
+import dev.iman.astrobookings.model.LaunchSummary;
 import dev.iman.astrobookings.model.Session;
 import dev.iman.astrobookings.model.UnauthorizedFailure;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.List;
@@ -33,6 +36,14 @@ class ApiClientTest {
     private static final String GENERIC_MESSAGE = "The API returned an unexpected response.";
     private static final String AUTH_BODY = """
             {"user":{"username":"ana","email":"ana@example.com"},"accessToken":"token-1"}
+            """;
+    private static final String BOOKING_BODY = """
+            {"id":"booking-1","activityId":"launch-1","userId":"user-1","participants":2,
+             "createdAt":"2026-11-05T10:00:00.000Z","paymentId":"payment-1","paymentStatus":"paid"}
+            """;
+    private static final String BOOKING_ACTIVITY = """
+            {"name":"Moon","slug":"moon","price":158.50,"date":"2026-12-20","duration":90,
+             "location":"Kourou","status":"published"}
             """;
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -403,6 +414,173 @@ class ApiClientTest {
 
         assertEquals(new ApiError(200, GENERIC_MESSAGE, List.of()), registerFailure.apiError());
         assertEquals(new ApiError(200, GENERIC_MESSAGE, List.of()), loginFailure.apiError());
+    }
+
+    @Test
+    void should_send_the_launch_id_as_activity_id_and_the_seats_as_participants_when_creating_a_booking()
+            throws IOException {
+        fakeApi.respondWith(201, BOOKING_BODY);
+
+        createBooking();
+
+        assertEquals("POST", fakeApi.receivedMethod());
+        assertEquals("/bookings", fakeApi.receivedPath());
+        assertEquals("application/json", fakeApi.receivedContentType());
+        assertEquals(
+                JSON.readTree("{\"activityId\":\"launch-1\",\"participants\":2}"),
+                JSON.readTree(fakeApi.receivedBodies().get(0)));
+    }
+
+    @Test
+    void should_send_the_token_as_a_bearer_header_when_creating_a_booking() {
+        fakeApi.respondWith(201, BOOKING_BODY);
+
+        createBooking();
+
+        assertEquals("Bearer token-1", fakeApi.receivedAuthorization());
+    }
+
+    @Test
+    void should_return_the_booking_with_no_launch_when_the_response_has_no_activity() {
+        fakeApi.respondWith(201, BOOKING_BODY);
+
+        Booking booking = createBooking();
+
+        assertEquals(
+                new Booking("booking-1", "launch-1", "user-1", 2, "2026-11-05T10:00:00.000Z", "payment-1", "paid", null),
+                booking);
+    }
+
+    @Test
+    void should_return_the_booking_with_no_payment_id_when_the_response_has_none() {
+        fakeApi.respondWith(201, BOOKING_BODY.replace("\"paymentId\":\"payment-1\",", ""));
+
+        assertNull(createBooking().paymentId());
+    }
+
+    @Test
+    void should_return_the_launch_summary_when_the_response_has_an_activity() {
+        fakeApi.respondWith(200, bookingBodyWithActivity(BOOKING_ACTIVITY));
+
+        Booking booking = createBooking();
+
+        assertEquals(
+                new LaunchSummary("Moon", "moon", new BigDecimal("158.50"), "2026-12-20", new BigDecimal("90"), "Kourou", "published"),
+                booking.launch());
+    }
+
+    @Test
+    void should_keep_a_fractional_duration_when_the_response_has_an_activity() {
+        fakeApi.respondWith(200, bookingBodyWithActivity(BOOKING_ACTIVITY.replace("\"duration\":90", "\"duration\":1.5")));
+
+        assertEquals(new BigDecimal("1.5"), createBooking().launch().duration());
+    }
+
+    @Test
+    void should_ignore_the_other_fields_when_the_booking_response_has_them() {
+        fakeApi.respondWith(201, BOOKING_BODY.replace("{", "{\"totalPrice\":316,\"updatedAt\":{\"at\":\"now\"},"));
+
+        assertEquals("booking-1", createBooking().id());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "",
+        "<html>",
+        "null",
+        "[]",
+        "7",
+        "{}",
+        "{\"activityId\":\"launch-1\",\"userId\":\"user-1\",\"participants\":2,\"createdAt\":\"now\",\"paymentStatus\":\"paid\"}",
+        "{\"id\":\" \",\"activityId\":\"launch-1\",\"userId\":\"user-1\",\"participants\":2,\"createdAt\":\"now\",\"paymentStatus\":\"paid\"}",
+        "{\"id\":\"booking-1\",\"userId\":\"user-1\",\"participants\":2,\"createdAt\":\"now\",\"paymentStatus\":\"paid\"}",
+        "{\"id\":\"booking-1\",\"activityId\":\" \",\"userId\":\"user-1\",\"participants\":2,\"createdAt\":\"now\",\"paymentStatus\":\"paid\"}",
+        "{\"id\":\"booking-1\",\"activityId\":\"launch-1\",\"participants\":2,\"createdAt\":\"now\",\"paymentStatus\":\"paid\"}",
+        "{\"id\":\"booking-1\",\"activityId\":\"launch-1\",\"userId\":\" \",\"participants\":2,\"createdAt\":\"now\",\"paymentStatus\":\"paid\"}",
+        "{\"id\":\"booking-1\",\"activityId\":\"launch-1\",\"userId\":\"user-1\",\"participants\":2,\"paymentStatus\":\"paid\"}",
+        "{\"id\":\"booking-1\",\"activityId\":\"launch-1\",\"userId\":\"user-1\",\"participants\":2,\"createdAt\":\" \",\"paymentStatus\":\"paid\"}",
+        "{\"id\":\"booking-1\",\"activityId\":\"launch-1\",\"userId\":\"user-1\",\"participants\":2,\"createdAt\":\"now\"}",
+        "{\"id\":\"booking-1\",\"activityId\":\"launch-1\",\"userId\":\"user-1\",\"participants\":2,\"createdAt\":\"now\",\"paymentStatus\":\" \"}",
+        "{\"id\":\"booking-1\",\"activityId\":\"launch-1\",\"userId\":\"user-1\",\"createdAt\":\"now\",\"paymentStatus\":\"paid\"}",
+        "{\"id\":\"booking-1\",\"activityId\":\"launch-1\",\"userId\":\"user-1\",\"participants\":null,\"createdAt\":\"now\",\"paymentStatus\":\"paid\"}",
+        "{\"id\":\"booking-1\",\"activityId\":\"launch-1\",\"userId\":\"user-1\",\"participants\":1.5,\"createdAt\":\"now\",\"paymentStatus\":\"paid\"}",
+        "{\"id\":\"booking-1\",\"activityId\":\"launch-1\",\"userId\":\"user-1\",\"participants\":2,\"createdAt\":\"now\",\"paymentStatus\":\"paid\",\"activity\":7}"
+    })
+    void should_fail_with_a_generic_error_when_the_booking_response_is_malformed(String body) {
+        fakeApi.respondWith(201, body);
+
+        ApiErrorFailure failure = createBookingExpectingApiError();
+
+        assertEquals(new ApiError(201, GENERIC_MESSAGE, List.of()), failure.apiError());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"name", "slug", "price", "date", "duration", "location", "status"})
+    void should_fail_with_a_generic_error_when_any_field_of_the_booking_activity_is_missing(String field) {
+        fakeApi.respondWith(200, bookingBodyWithActivity(BOOKING_ACTIVITY.replace("\"" + field + "\":", "\"other\":")));
+
+        ApiErrorFailure failure = createBookingExpectingApiError();
+
+        assertEquals(new ApiError(200, GENERIC_MESSAGE, List.of()), failure.apiError());
+    }
+
+    @Test
+    void should_keep_the_status_and_exact_message_when_the_capacity_is_exceeded() {
+        fakeApi.respondWith(400, "{\"message\":\"Capacity exceeded. Available: 2, Requested: 3\",\"errors\":[]}");
+
+        ApiErrorFailure failure = createBookingExpectingApiError();
+
+        assertEquals(new ApiError(400, "Capacity exceeded. Available: 2, Requested: 3", List.of()), failure.apiError());
+    }
+
+    @Test
+    void should_keep_the_status_and_exact_message_when_the_payment_is_rejected() {
+        fakeApi.respondWith(402, "{\"message\":\"Payment could not be processed\",\"errors\":[]}");
+
+        ApiErrorFailure failure = createBookingExpectingApiError();
+
+        assertEquals(new ApiError(402, "Payment could not be processed", List.of()), failure.apiError());
+    }
+
+    @Test
+    void should_fail_as_unauthorized_when_creating_a_booking_responds_401() {
+        fakeApi.respondWith(401, "{\"message\":\"Unauthorized\",\"errors\":[]}");
+
+        UnauthorizedFailure failure = assertThrows(UnauthorizedFailure.class, this::createBooking);
+
+        assertEquals(new ApiError(401, "Unauthorized", List.of()), failure.apiError());
+    }
+
+    @Test
+    void should_fail_as_not_reachable_when_creating_a_booking_with_the_api_down() {
+        fakeApi.stop();
+
+        ApiNotReachableFailure failure = assertThrows(ApiNotReachableFailure.class, this::createBooking);
+
+        assertEquals(fakeApi.url(), failure.url());
+    }
+
+    @Test
+    void should_fail_with_a_generic_error_when_the_token_cannot_be_sent_in_a_header() {
+        ApiClient apiClient = apiClient(fakeApi.url());
+
+        ApiErrorFailure failure = assertThrows(
+                ApiErrorFailure.class, () -> apiClient.createBooking("token\n1", "launch-1", BigInteger.TWO));
+
+        assertEquals(new ApiError(0, GENERIC_MESSAGE, List.of()), failure.apiError());
+        assertEquals(0, fakeApi.receivedRequests());
+    }
+
+    private Booking createBooking() {
+        return apiClient(fakeApi.url()).createBooking("token-1", "launch-1", BigInteger.TWO);
+    }
+
+    private ApiErrorFailure createBookingExpectingApiError() {
+        return assertThrows(ApiErrorFailure.class, this::createBooking);
+    }
+
+    private static String bookingBodyWithActivity(String activity) {
+        return BOOKING_BODY.replace("{", "{\"activity\":" + activity + ",");
     }
 
     private ApiErrorFailure fetchExpectingApiError() {

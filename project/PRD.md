@@ -30,8 +30,8 @@
 | FR3 | The user can start the client and continue with the saved session without registering again.     | done        |
 | FR4 | Session management: the user can log out, which deletes `~/.astrobookings/session.json`.         | done        |
 | FR5 | The user whose session the API rejects with a 401 is asked to register again.                    | done        |
-| FR6 | The user can book a chosen number of seats on a published or confirmed launch.                   | in-progress |
-| FR7 | The user who requests more seats than are free sees the available and requested numbers.         | in-progress |
+| FR6 | The user can book a chosen number of seats on a published or confirmed launch.                   | done        |
+| FR7 | The user who requests more seats than are free sees the available and requested numbers.         | done        |
 | FR8 | The user can list their bookings and see the `paymentStatus` of each one.                        | in-progress |
 | FR9 | The user can view the details of a single booking, including its `paymentStatus`.                | in-progress |
 

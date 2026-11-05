@@ -4,6 +4,7 @@ import dev.iman.astrobookings.api.ApiClient;
 import dev.iman.astrobookings.cli.ConsoleMenu;
 import dev.iman.astrobookings.cli.PasswordPrompt;
 import dev.iman.astrobookings.cli.StartupErrorView;
+import dev.iman.astrobookings.service.BookingService;
 import dev.iman.astrobookings.service.LaunchService;
 import dev.iman.astrobookings.service.SessionService;
 import dev.iman.astrobookings.session.SessionStore;
@@ -93,10 +94,12 @@ public final class Main {
         ApiClient apiClient = new ApiClient(HttpClient.newHttpClient(), apiUrl, REQUEST_TIMEOUT);
         LaunchService launchService = new LaunchService(apiClient);
         SessionService sessionService = new SessionService(apiClient, new SessionStore(sessionFile));
+        BookingService bookingService = new BookingService(apiClient, launchService, sessionService);
         if (console == null) {
-            return new ConsoleMenu(launchService, sessionService, input, output);
+            return new ConsoleMenu(launchService, sessionService, bookingService, input, output);
         }
-        return new ConsoleMenu(launchService, sessionService, input, output, passwordPromptOver(console));
+        return new ConsoleMenu(
+                launchService, sessionService, bookingService, input, output, passwordPromptOver(console));
     }
 
     private static PasswordPrompt passwordPromptOver(Console console) {

@@ -18,7 +18,11 @@ public final class LaunchService {
 
     public List<Launch> listOpenLaunches() {
         return apiClient.fetchLaunches().stream()
-                .filter(launch -> OPEN_FOR_BOOKING_STATUSES.contains(launch.status()))
+                .filter(this::isOpenForBooking)
                 .toList();
+    }
+
+    public boolean isOpenForBooking(Launch launch) {
+        return OPEN_FOR_BOOKING_STATUSES.contains(launch.status());
     }
 }
