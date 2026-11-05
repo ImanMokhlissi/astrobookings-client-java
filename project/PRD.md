@@ -25,29 +25,29 @@
 
 | ID  | Description                                                                                      | Status      |
 |-----|--------------------------------------------------------------------------------------------------|-------------|
-| FR1 | The user can list published or confirmed launches with name, price, date, duration, location, participant limits and status. | not-started |
-| FR2 | Session management: the user can register (username, email, password, accepting the terms) or log in, and a login 401 is explained clearly with registration offered. | not-started |
-| FR3 | The user can start the client and continue with the saved session without registering again.     | not-started |
-| FR4 | Session management: the user can log out, which deletes `~/.astrobookings/session.json`.         | not-started |
-| FR5 | The user whose session the API rejects with a 401 is asked to register again.                    | not-started |
-| FR6 | The user can book a chosen number of seats on a published or confirmed launch.                   | not-started |
-| FR7 | The user who requests more seats than are free sees the available and requested numbers.         | not-started |
-| FR8 | The user can list their bookings and see the `paymentStatus` of each one.                        | not-started |
-| FR9 | The user can view the details of a single booking, including its `paymentStatus`.                | not-started |
+| FR1 | The user can list published or confirmed launches with name, price, date, duration, location, participant limits and status. | in-progress |
+| FR2 | Session management: the user can register (username, email, password, accepting the terms) or log in, and a login 401 is explained clearly with registration offered. | in-progress |
+| FR3 | The user can start the client and continue with the saved session without registering again.     | in-progress |
+| FR4 | Session management: the user can log out, which deletes `~/.astrobookings/session.json`.         | in-progress |
+| FR5 | The user whose session the API rejects with a 401 is asked to register again.                    | in-progress |
+| FR6 | The user can book a chosen number of seats on a published or confirmed launch.                   | in-progress |
+| FR7 | The user who requests more seats than are free sees the available and requested numbers.         | in-progress |
+| FR8 | The user can list their bookings and see the `paymentStatus` of each one.                        | in-progress |
+| FR9 | The user can view the details of a single booking, including its `paymentStatus`.                | in-progress |
 
 ## Technical requirements
 
 | ID  | Description                                                                                       | Status      |
 |-----|---------------------------------------------------------------------------------------------------|-------------|
-| TR1 | Console application in Java 21, built with Maven through the Maven Wrapper, with no heavy frameworks. | not-started |
-| TR2 | HTTP calls use `java.net.http.HttpClient` against the API URL configured with the environment variable `ASTROBOOKINGS_API_URL`, with `http://localhost:3000` as the default. | not-started |
-| TR3 | JSON is handled with Jackson, and API fields not listed in the constraints are ignored.           | not-started |
-| TR4 | The client says "launches" to the user and maps them internally to the API's "activities". Exception: API error messages are shown verbatim, so they may say 'activity' (see ADR-3). | not-started |
-| TR5 | The token is stored outside the repository in `~/.astrobookings/session.json` and read on startup. | not-started |
-| TR6 | Booking requests send the token in an `Authorization: Bearer <token>` header.                     | not-started |
-| TR7 | API errors in the format `{message, errors:[{field, message}]}` are shown to the user in a readable form. | not-started |
-| TR8 | Tests are written with JUnit 5 and run with `./mvnw test`.                                        | not-started |
-| TR9 | If the API is not running, the client shows `API not reachable at <url>`, with the configured URL, instead of a stack trace. | not-started |
+| TR1 | Console application in Java 21, built with Maven through the Maven Wrapper, with no heavy frameworks. | in-progress |
+| TR2 | HTTP calls use `java.net.http.HttpClient` against the API URL configured with the environment variable `ASTROBOOKINGS_API_URL`, with `http://localhost:3000` as the default. | in-progress |
+| TR3 | JSON is handled with Jackson, and API fields not listed in the constraints are ignored.           | in-progress |
+| TR4 | The client says "launches" to the user and maps them internally to the API's "activities". Exception: API error messages are shown verbatim, so they may say 'activity' (see ADR-3). | in-progress |
+| TR5 | The token is stored outside the repository in `~/.astrobookings/session.json` and read on startup. | in-progress |
+| TR6 | Booking requests send the token in an `Authorization: Bearer <token>` header.                     | in-progress |
+| TR7 | API errors in the format `{message, errors:[{field, message}]}` are shown to the user in a readable form. | in-progress |
+| TR8 | Tests are written with JUnit 5 and run with `./mvnw test`.                                        | in-progress |
+| TR9 | If the API is not running, the client shows `API not reachable at <url>`, with the configured URL, instead of a stack trace. | in-progress |
 
 ## Assumptions & constraints
 
