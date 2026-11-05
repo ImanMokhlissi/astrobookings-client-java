@@ -47,7 +47,7 @@
 | TR6 | Booking requests send the token in an `Authorization: Bearer <token>` header.                     | not-started |
 | TR7 | API errors in the format `{message, errors:[{field, message}]}` are shown to the user in a readable form. | not-started |
 | TR8 | Tests are written with JUnit 5 and run with `./mvnw test`.                                        | not-started |
-| TR9 | If the API is not running, the client shows "API not reachable at http://localhost:3000" instead of a stack trace. | not-started |
+| TR9 | If the API is not running, the client shows `API not reachable at <url>`, with the configured URL, instead of a stack trace. | not-started |
 
 ## Assumptions & constraints
 
@@ -57,7 +57,7 @@
 
 **Constraints**:
 
-- The client depends on the activity-bookings-express API, which must be running at `http://localhost:3000`.
+- The client depends on the activity-bookings-express API, which must be reachable at the configured URL (`ASTROBOOKINGS_API_URL`), by default `http://localhost:3000`.
 - The console interface is in English.
 - `GET /activities` is public and provides id, name, slug, price, date, duration, location, minParticipants, maxParticipants and status.
 - The launch list shows only `published` and `confirmed` launches.
