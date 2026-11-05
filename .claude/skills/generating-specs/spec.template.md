@@ -27,7 +27,7 @@
 
 ## Acceptance criteria
 
-<!-- At most 9, numbered, in EARS format. See EARS.md. -->
+<!-- At most 12, numbered, in EARS format. See EARS.md. -->
 
 - **AC1**: {WHEN trigger, the system SHALL response.}
 
