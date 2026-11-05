@@ -89,6 +89,14 @@ class ConsoleMenuTest {
             {"id":"booking-1","activityId":"id-Mars","userId":"user-1","participants":2,
              "createdAt":"2026-11-05T10:00:00.000Z","paymentId":"payment-1","paymentStatus":"paid"}
             """;
+    private static final String BOOKING_PROMPT = "Booking number (0 to cancel):";
+    private static final String NO_BOOKINGS_LINE = "You have no bookings.";
+    private static final String INVALID_BOOKING_NUMBER_LINE = "Enter a booking number from the list.";
+    private static final String FIRST_BOOKING_LINE = "1. booking-1 - Moon - Seats: 1 - Payment status: paid";
+    private static final String SECOND_BOOKING_LINE = "2. booking-2 - Mars - Seats: 3 - Payment status: pending";
+    private static final String TWO_RETRIEVED_BOOKINGS = "["
+            + retrievedBooking("booking-1", "Moon", 1, "paid") + ","
+            + retrievedBooking("booking-2", "Mars", 3, "pending") + "]";
     private static final ObjectMapper JSON = new ObjectMapper();
 
     @TempDir
@@ -973,6 +981,406 @@ class ConsoleMenuTest {
 
         assertFalse(lines.contains("Booking created."));
         assertShownThenMenuAgain(lines, GENERIC_ERROR_LINE);
+    }
+
+    @Test
+    void should_show_the_options_to_list_and_view_bookings_when_started() {
+        List<String> lines = runMenu("0\n");
+
+        assertTrue(lines.containsAll(List.of("6. List my bookings", "7. View a booking")));
+    }
+
+    @Test
+    void should_number_the_bookings_from_1_with_id_launch_name_seats_and_payment_status_when_listing_them() {
+        startSession();
+        respondWithTwoBookings();
+
+        List<String> lines = runMenu("6\n0\n");
+
+        assertEquals("/bookings", fakeApi.receivedPath());
+        assertTrue(lines.indexOf(FIRST_BOOKING_LINE) >= 0);
+        assertTrue(lines.indexOf(FIRST_BOOKING_LINE) < lines.indexOf(SECOND_BOOKING_LINE));
+        assertShownThenMenuAgain(lines, SECOND_BOOKING_LINE);
+    }
+
+    @Test
+    void should_show_the_payment_status_as_the_api_sends_it_when_listing_the_bookings() {
+        startSession();
+        fakeApi.respondWith(200, "[" + retrievedBooking("booking-1", "Moon", 1, "Under Review") + "]");
+
+        List<String> lines = runMenu("6\n0\n");
+
+        assertTrue(lines.contains("1. booking-1 - Moon - Seats: 1 - Payment status: Under Review"));
+    }
+
+    @Test
+    void should_show_the_message_and_the_menu_again_when_the_user_has_no_bookings() {
+        startSession();
+        fakeApi.respondWith(200, "[]");
+
+        List<String> lines = runMenu("6\n0\n");
+
+        assertShownThenMenuAgain(lines, NO_BOOKINGS_LINE);
+    }
+
+    @Test
+    void should_ask_for_nothing_after_listing_the_bookings() {
+        startSession();
+        respondWithTwoBookings();
+
+        List<String> lines = runMenu("6\n0\n");
+
+        assertEquals(1, fakeApi.receivedRequests());
+        assertFalse(lines.contains(BOOKING_PROMPT));
+        assertEquals(2, timesMenuShown(lines));
+    }
+
+    @Test
+    void should_fetch_a_fresh_list_each_time_the_list_option_is_selected() {
+        startSession();
+        fakeApi.queueResponse(200, "[" + retrievedBooking("booking-1", "Moon", 1, "paid") + "]");
+        fakeApi.queueResponse(200, "[" + retrievedBooking("booking-2", "Mars", 3, "paid") + "]");
+
+        List<String> lines = runMenu("6\n6\n0\n");
+
+        assertEquals(2, fakeApi.receivedRequests());
+        assertTrue(lines.contains("1. booking-1 - Moon - Seats: 1 - Payment status: paid"));
+        assertTrue(lines.contains("1. booking-2 - Mars - Seats: 3 - Payment status: paid"));
+    }
+
+    @Test
+    void should_tell_the_user_to_register_or_log_in_without_calling_the_api_when_listing_the_bookings_with_no_session() {
+        List<String> lines = runMenu("6\n0\n");
+
+        assertEquals(0, fakeApi.receivedRequests());
+        assertShownThenMenuAgain(lines, NO_SESSION_LINE);
+    }
+
+    @Test
+    void should_delete_the_file_and_ask_to_register_again_when_listing_the_bookings_responds_401() {
+        startSession();
+        fakeApi.respondWith(401, "{\"message\":\"Unauthorized\",\"errors\":[]}");
+
+        List<String> lines = runMenu("6\n0\n");
+
+        assertFalse(Files.exists(sessionFile));
+        assertFalse(lines.contains("Unauthorized"));
+        assertShownThenMenuAgain(lines, SESSION_REJECTED_LINE);
+    }
+
+    @Test
+    void should_show_the_message_and_the_menu_again_when_listing_the_bookings_responds_with_an_error() {
+        startSession();
+        fakeApi.respondWith(500, "{\"message\":\"Failed to retrieve bookings\",\"errors\":[]}");
+
+        List<String> lines = runMenu("6\n0\n");
+
+        assertShownThenMenuAgain(lines, "Failed to retrieve bookings");
+        assertEquals(Optional.of(ANA), new SessionStore(sessionFile).read());
+    }
+
+    @Test
+    void should_show_not_reachable_and_the_menu_again_when_listing_the_bookings_with_the_api_down() {
+        startSession();
+        fakeApi.stop();
+
+        List<String> lines = runMenu("6\n0\n");
+
+        assertShownThenMenuAgain(lines, "API not reachable at " + fakeApi.url());
+        assertEquals(Optional.of(ANA), new SessionStore(sessionFile).read());
+    }
+
+    @Test
+    void should_number_the_bookings_from_1_when_viewing_a_booking() {
+        startSession();
+        respondWithTwoBookings();
+
+        List<String> lines = runMenu("7\n0\n0\n");
+
+        assertTrue(lines.indexOf(FIRST_BOOKING_LINE) >= 0);
+        assertTrue(lines.indexOf(FIRST_BOOKING_LINE) < lines.indexOf(SECOND_BOOKING_LINE));
+        assertTrue(lines.indexOf(SECOND_BOOKING_LINE) < lines.indexOf(BOOKING_PROMPT));
+    }
+
+    @Test
+    void should_say_that_0_cancels_when_asking_for_the_booking_number() {
+        startSession();
+        respondWithTwoBookings();
+
+        List<String> lines = runMenu("7\n0\n0\n");
+
+        assertTrue(lines.contains("Booking number (0 to cancel):"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "00"})
+    void should_cancel_without_requesting_the_booking_when_the_booking_number_is_0(String entry) {
+        startSession();
+        respondWithTwoBookings();
+
+        List<String> lines = runMenu("7\n" + entry + "\n0\n");
+
+        assertEquals(1, fakeApi.receivedRequests());
+        assertEquals("/bookings", fakeApi.receivedPath());
+        assertEquals(2, timesMenuShown(lines));
+    }
+
+    @Test
+    void should_ask_for_nothing_when_viewing_with_no_bookings() {
+        startSession();
+        fakeApi.respondWith(200, "[]");
+
+        List<String> lines = runMenu("7\n0\n");
+
+        assertEquals(1, fakeApi.receivedRequests());
+        assertFalse(lines.contains(BOOKING_PROMPT));
+        assertShownThenMenuAgain(lines, NO_BOOKINGS_LINE);
+    }
+
+    @Test
+    void should_fetch_a_fresh_list_each_time_the_view_option_is_selected() {
+        startSession();
+        fakeApi.queueResponse(200, "[" + retrievedBooking("booking-1", "Moon", 1, "paid") + "]");
+        fakeApi.queueResponse(200, "[" + retrievedBooking("booking-2", "Mars", 3, "paid") + "]");
+
+        List<String> lines = runMenu("7\n0\n7\n0\n0\n");
+
+        assertEquals(2, fakeApi.receivedRequests());
+        assertTrue(lines.contains("1. booking-1 - Moon - Seats: 1 - Payment status: paid"));
+        assertTrue(lines.contains("1. booking-2 - Mars - Seats: 3 - Payment status: paid"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"3", "-1", "abc", "1.5", "", "99999999999999999999"})
+    void should_ask_again_without_a_request_when_the_booking_number_is_invalid(String entry) {
+        startSession();
+        respondWithTwoBookings();
+
+        List<String> lines = runMenu("7\n" + entry + "\n0\n0\n");
+
+        assertEquals(1, fakeApi.receivedRequests());
+        assertEquals(2, timesShown(lines, BOOKING_PROMPT));
+        assertEquals(1, timesShown(lines, FIRST_BOOKING_LINE));
+        assertTrue(lines.contains(INVALID_BOOKING_NUMBER_LINE));
+        assertFalse(String.join("\n", lines).contains("Exception"));
+    }
+
+    @Test
+    void should_end_without_requesting_the_booking_when_the_input_ends_at_the_booking_number_prompt() {
+        startSession();
+        respondWithTwoBookings();
+
+        List<String> lines = runMenu("7\n");
+
+        assertEquals(1, fakeApi.receivedRequests());
+        assertEquals(2, timesMenuShown(lines));
+    }
+
+    @Test
+    void should_tell_the_user_to_register_or_log_in_without_calling_the_api_when_viewing_a_booking_with_no_session() {
+        List<String> lines = runMenu("7\n0\n");
+
+        assertEquals(0, fakeApi.receivedRequests());
+        assertFalse(lines.contains(BOOKING_PROMPT));
+        assertShownThenMenuAgain(lines, NO_SESSION_LINE);
+    }
+
+    @Test
+    void should_request_the_id_of_the_chosen_booking_when_choosing_one_that_is_not_the_first() {
+        startSession();
+        respondWithTwoBookingsThenTheSecond();
+
+        runMenu("7\n2\n0\n");
+
+        assertEquals(2, fakeApi.receivedRequests());
+        assertEquals("GET", fakeApi.receivedMethod());
+        assertEquals("/bookings/booking-2", fakeApi.receivedPath());
+        assertEquals("Bearer token-1", fakeApi.receivedAuthorization());
+    }
+
+    @Test
+    void should_show_every_field_of_the_chosen_booking_and_the_menu_again() {
+        startSession();
+        respondWithTwoBookingsThenTheSecond();
+
+        List<String> lines = runMenu("7\n2\n0\n");
+
+        assertTrue(lines.containsAll(List.of(
+                "Booking id: booking-2",
+                "Seats: 3",
+                "Created: November 5, 2026, 10:00 UTC",
+                "Payment id: payment-1",
+                "Payment status: paid",
+                "Launch: Mars",
+                "Price: 158.50",
+                "Date: December 20, 2026",
+                "Duration: 90",
+                "Location: Kourou")));
+        assertShownThenMenuAgain(lines, "Launch status: published");
+    }
+
+    @Test
+    void should_show_a_fractional_duration_with_no_rounding_when_viewing_a_booking() {
+        startSession();
+        String fractional = retrievedBooking("booking-1", "Moon", 1, "paid").replace("\"duration\":90", "\"duration\":1.25");
+        fakeApi.queueResponse(200, "[" + fractional + "]");
+        fakeApi.respondWith(200, fractional);
+
+        List<String> lines = runMenu("7\n1\n0\n");
+
+        assertTrue(lines.contains("Duration: 1.25"));
+    }
+
+    @Test
+    void should_show_the_payment_status_as_the_api_sends_it_when_viewing_a_booking() {
+        startSession();
+        String booking = retrievedBooking("booking-1", "Moon", 1, "Under Review");
+        fakeApi.queueResponse(200, "[" + booking + "]");
+        fakeApi.respondWith(200, booking);
+
+        List<String> lines = runMenu("7\n1\n0\n");
+
+        assertTrue(lines.contains("Payment status: Under Review"));
+    }
+
+    @Test
+    void should_say_there_is_no_payment_id_when_the_booking_has_none() {
+        startSession();
+        String booking = retrievedBooking("booking-1", "Moon", 1, "paid").replace("\"paymentId\":\"payment-1\",", "");
+        fakeApi.queueResponse(200, "[" + booking + "]");
+        fakeApi.respondWith(200, booking);
+
+        List<String> lines = runMenu("7\n1\n0\n");
+
+        assertTrue(lines.contains("Payment id: none"));
+    }
+
+    @Test
+    void should_delete_the_file_and_ask_to_register_again_when_viewing_the_booking_responds_401() {
+        startSession();
+        respondWithTwoBookingsThen(401, "{\"message\":\"Unauthorized\",\"errors\":[]}");
+
+        List<String> lines = runMenu("7\n1\n0\n");
+
+        assertFalse(Files.exists(sessionFile));
+        assertFalse(lines.contains("Unauthorized"));
+        assertShownThenMenuAgain(lines, SESSION_REJECTED_LINE);
+    }
+
+    @Test
+    void should_show_the_message_and_the_menu_again_when_the_chosen_booking_no_longer_exists() {
+        startSession();
+        respondWithTwoBookingsThen(404, "{\"message\":\"Booking not found\",\"errors\":[]}");
+
+        List<String> lines = runMenu("7\n1\n0\n");
+
+        assertShownThenMenuAgain(lines, "Booking not found");
+        assertEquals(Optional.of(ANA), new SessionStore(sessionFile).read());
+    }
+
+    @Test
+    void should_show_a_generic_error_and_the_menu_again_when_the_viewed_booking_response_is_malformed() {
+        startSession();
+        respondWithTwoBookingsThen(200, BOOKING_BODY);
+
+        List<String> lines = runMenu("7\n1\n0\n");
+
+        assertFalse(lines.contains("Booking id: booking-1"));
+        assertShownThenMenuAgain(lines, GENERIC_ERROR_LINE);
+    }
+
+    @Test
+    void should_show_not_reachable_and_the_menu_again_when_the_api_goes_down_before_the_booking_is_requested() {
+        startSession();
+        respondWithTwoBookings();
+        InputStream input = new OneLinePerRead(List.of("7\n", "1\n", "0\n"), 1, fakeApi::stop);
+
+        List<String> lines = runMenu(input, TIMEOUT);
+
+        assertTrue(lines.contains(FIRST_BOOKING_LINE));
+        assertShownThenMenuAgain(lines, "API not reachable at " + fakeApi.url());
+        assertEquals(Optional.of(ANA), new SessionStore(sessionFile).read());
+    }
+
+    @Test
+    void should_not_say_activity_when_showing_the_retrieval_texts() {
+        startSession();
+        String booking = retrievedBooking("booking-1", "Moon", 1, "paid");
+        fakeApi.queueResponse(200, "[" + booking + "]");
+        fakeApi.queueResponse(200, "[" + booking + "]");
+        fakeApi.queueResponse(200, booking);
+        fakeApi.queueResponse(200, "[]");
+        List<String> shown = runMenu("6\n7\n9\n1\n6\n0\n");
+        fakeApi.stop();
+        List<String> notReachable = runMenu("6\n7\n0\n");
+
+        assertTrue(shown.containsAll(List.of(
+                "1. booking-1 - Moon - Seats: 1 - Payment status: paid",
+                BOOKING_PROMPT,
+                INVALID_BOOKING_NUMBER_LINE,
+                "Launch status: published",
+                NO_BOOKINGS_LINE)));
+        assertTrue(notReachable.contains("API not reachable at " + fakeApi.url()));
+        assertFalse(sayActivity(shown));
+        assertFalse(sayActivity(notReachable));
+    }
+
+    private void respondWithTwoBookings() {
+        fakeApi.respondWith(200, TWO_RETRIEVED_BOOKINGS);
+    }
+
+    private void respondWithTwoBookingsThenTheSecond() {
+        respondWithTwoBookingsThen(200, retrievedBooking("booking-2", "Mars", 3, "paid"));
+    }
+
+    private void respondWithTwoBookingsThen(int status, String body) {
+        fakeApi.queueResponse(200, TWO_RETRIEVED_BOOKINGS);
+        fakeApi.respondWith(status, body);
+    }
+
+    private static String retrievedBooking(String id, String launchName, int seats, String paymentStatus) {
+        return """
+                {"id":"%1$s","activityId":"id-%2$s","userId":"user-1","participants":%3$d,
+                 "createdAt":"2026-11-05T10:00:00.000Z","paymentId":"payment-1","paymentStatus":"%4$s",
+                 "activity":{"name":"%2$s","slug":"slug","price":158.50,"date":"2026-12-20","duration":90,
+                             "location":"Kourou","status":"published"}}
+                """.formatted(id, launchName, seats, paymentStatus);
+    }
+
+    /**
+     * Hands over one line per read, because {@code BufferedReader} would otherwise read ahead, and
+     * runs an action just before handing over the line at the given index.
+     */
+    private static final class OneLinePerRead extends InputStream {
+
+        private final List<String> lines;
+        private final int actionLineIndex;
+        private final Runnable action;
+        private int nextLineIndex = 0;
+
+        OneLinePerRead(List<String> lines, int actionLineIndex, Runnable action) {
+            this.lines = lines;
+            this.actionLineIndex = actionLineIndex;
+            this.action = action;
+        }
+
+        @Override
+        public int read() {
+            throw new UnsupportedOperationException("The reader asks for a whole buffer.");
+        }
+
+        @Override
+        public int read(byte[] buffer, int offset, int length) {
+            if (nextLineIndex == lines.size()) {
+                return -1;
+            }
+            if (nextLineIndex == actionLineIndex) {
+                action.run();
+            }
+            byte[] line = lines.get(nextLineIndex++).getBytes(StandardCharsets.UTF_8);
+            System.arraycopy(line, 0, buffer, offset, line.length);
+            return line.length;
+        }
     }
 
     private void startSession() {

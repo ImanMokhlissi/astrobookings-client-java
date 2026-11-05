@@ -36,6 +36,8 @@ public final class ConsoleMenu {
     private static final String LOG_IN_OPTION = "3";
     private static final String LOG_OUT_OPTION = "4";
     private static final String BOOK_SEATS_OPTION = "5";
+    private static final String LIST_BOOKINGS_OPTION = "6";
+    private static final String VIEW_BOOKING_OPTION = "7";
     private static final String EXIT_OPTION = "0";
     private static final String EMAIL_FIELD = "email";
     private static final String EMAIL_PROMPT = "Email:";
@@ -48,6 +50,7 @@ public final class ConsoleMenu {
     private final PrintStream output;
     private final PasswordPrompt passwordPrompt;
     private final BookingFlow bookingFlow;
+    private final BookingRetrievalFlow bookingRetrievalFlow;
 
     /** Reads passwords from the injected input, for when there is no console. */
     public ConsoleMenu(
@@ -62,6 +65,8 @@ public final class ConsoleMenu {
         this.output = output;
         this.passwordPrompt = this::readPasswordFromInput;
         this.bookingFlow = new BookingFlow(bookingService, newNumberPrompt(), output, this::showFailure);
+        this.bookingRetrievalFlow =
+                new BookingRetrievalFlow(bookingService, newNumberPrompt(), output, this::showFailure);
     }
 
     public ConsoleMenu(
@@ -77,6 +82,8 @@ public final class ConsoleMenu {
         this.output = output;
         this.passwordPrompt = passwordPrompt;
         this.bookingFlow = new BookingFlow(bookingService, newNumberPrompt(), output, this::showFailure);
+        this.bookingRetrievalFlow =
+                new BookingRetrievalFlow(bookingService, newNumberPrompt(), output, this::showFailure);
     }
 
     private static BufferedReader readerOver(InputStream input) {
@@ -116,6 +123,8 @@ public final class ConsoleMenu {
         output.println(LOG_IN_OPTION + ". Log in");
         output.println(LOG_OUT_OPTION + ". Log out");
         output.println(BOOK_SEATS_OPTION + ". Book seats");
+        output.println(LIST_BOOKINGS_OPTION + ". List my bookings");
+        output.println(VIEW_BOOKING_OPTION + ". View a booking");
         output.println(EXIT_OPTION + ". Exit");
         output.println("Select an option:");
     }
@@ -159,6 +168,8 @@ public final class ConsoleMenu {
             case LOG_IN_OPTION -> logIn();
             case LOG_OUT_OPTION -> logOut();
             case BOOK_SEATS_OPTION -> bookingFlow.run();
+            case LIST_BOOKINGS_OPTION -> bookingRetrievalFlow.listBookings();
+            case VIEW_BOOKING_OPTION -> bookingRetrievalFlow.viewBooking();
             default -> output.println("Unknown option. Select one of the options in the menu.");
         }
     }
