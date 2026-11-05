@@ -61,7 +61,7 @@ public final class ConsoleMenu {
         this.input = readerOver(input);
         this.output = output;
         this.passwordPrompt = this::readPasswordFromInput;
-        this.bookingFlow = new BookingFlow(bookingService, this::promptFor, output, this::showFailure);
+        this.bookingFlow = new BookingFlow(bookingService, newNumberPrompt(), output, this::showFailure);
     }
 
     public ConsoleMenu(
@@ -76,11 +76,15 @@ public final class ConsoleMenu {
         this.input = readerOver(input);
         this.output = output;
         this.passwordPrompt = passwordPrompt;
-        this.bookingFlow = new BookingFlow(bookingService, this::promptFor, output, this::showFailure);
+        this.bookingFlow = new BookingFlow(bookingService, newNumberPrompt(), output, this::showFailure);
     }
 
     private static BufferedReader readerOver(InputStream input) {
         return new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8));
+    }
+
+    private NumberPrompt newNumberPrompt() {
+        return new NumberPrompt(this::promptFor, output);
     }
 
     public void run() {

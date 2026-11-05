@@ -10,28 +10,24 @@ import java.math.BigInteger;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.regex.Pattern;
 
 /** The booking option of the menu: choose a launch by its number, enter the seats and confirm. */
 final class BookingFlow {
 
-    private static final Pattern WHOLE_NUMBER = Pattern.compile("[0-9]+");
     private static final int PAYMENT_REJECTED_STATUS = 402;
 
     private final BookingService bookingService;
-    private final Function<String, Optional<String>> promptFor;
+    private final NumberPrompt numberPrompt;
     private final PrintStream output;
     private final Consumer<ApiFailure> showFailure;
 
     BookingFlow(
             BookingService bookingService,
-            Function<String, Optional<String>> promptFor,
+            NumberPrompt numberPrompt,
             PrintStream output,
             Consumer<ApiFailure> showFailure) {
         this.bookingService = bookingService;
-        this.promptFor = promptFor;
+        this.numberPrompt = numberPrompt;
         this.output = output;
         this.showFailure = showFailure;
     }
@@ -67,7 +63,8 @@ final class BookingFlow {
 
     private Optional<Launch> chooseLaunch(List<Launch> launches) {
         BigInteger lastNumber = BigInteger.valueOf(launches.size());
-        return promptForNumber(
+        return numberPrompt
+                .promptForNumber(
                         "Launch number (0 to cancel):",
                         number -> number.compareTo(lastNumber) <= 0,
                         "Enter a launch number from the list.")
@@ -75,34 +72,12 @@ final class BookingFlow {
     }
 
     private void askForSeats(Launch launch) {
-        promptForNumber(
+        numberPrompt
+                .promptForNumber(
                         "Seats (0 to cancel):",
                         number -> true,
                         "The seats must be a whole number of at least 1.")
                 .ifPresent(seats -> book(launch, seats));
-    }
-
-    /** Asks until the entry is accepted. An empty result means that it was 0 or that the input ended. */
-    private Optional<BigInteger> promptForNumber(
-            String prompt, Predicate<BigInteger> isAccepted, String invalidEntryMessage) {
-        Optional<String> entry = promptFor.apply(prompt);
-        while (entry.isPresent()) {
-            Optional<BigInteger> number = readWholeNumber(entry.get());
-            if (number.filter(BigInteger.ZERO::equals).isPresent()) {
-                return Optional.empty();
-            }
-            if (number.filter(isAccepted).isPresent()) {
-                return number;
-            }
-            output.println(invalidEntryMessage);
-            entry = promptFor.apply(prompt);
-        }
-        return Optional.empty();
-    }
-
-    /** Only ASCII digits count. {@code BigInteger} takes a number of any length. */
-    private static Optional<BigInteger> readWholeNumber(String entry) {
-        return WHOLE_NUMBER.matcher(entry).matches() ? Optional.of(new BigInteger(entry)) : Optional.empty();
     }
 
     private void book(Launch launch, BigInteger seats) {
