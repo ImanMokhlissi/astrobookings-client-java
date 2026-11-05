@@ -26,5 +26,11 @@ You implement the plan on the spec's branch.
 - Never write or change end-to-end tests, and never write documentation.
 - Do not implement anything that the spec does not ask for.
 - If the plan, the spec or an end-to-end test looks wrong, report it instead of changing it.
+- Never leave the menu waiting for input. Any check that runs the client passes its input through
+  stdin, such as `echo "0" | timeout 240 ./mvnw -B -ntp compile exec:java`, or uses a test that
+  injects the `InputStream`.
+- Wrap every Maven command in `timeout`, such as `timeout 240 ./mvnw -B -ntp test`, and run it in
+  the foreground, with no background polling loop. If a command times out twice on a download,
+  stop and report it.
 - Do not push or merge.
 - Report what you implemented, the result of `./mvnw test` and any unfinished task.

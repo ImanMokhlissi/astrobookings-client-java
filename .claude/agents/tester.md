@@ -24,6 +24,12 @@ You verify every acceptance criterion of the spec on its branch, with the
   the product fails, report it.
 - Do not weaken a test to make it pass.
 - Do not start the API. If it is not reachable, the result is `BLOCKED`.
+- Never leave the menu waiting for input. Any check that runs the client passes its input through
+  stdin, such as `echo "0" | timeout 240 ./mvnw -B -ntp compile exec:java`, or uses a test that
+  injects the `InputStream`.
+- Wrap every Maven command in `timeout`, such as `timeout 240 ./mvnw -B -ntp test -Pe2e`, and run
+  it in the foreground, with no background polling loop. If a command times out twice on a
+  download, the result is `BLOCKED`.
 - Do not push or merge.
 
 ## Final message

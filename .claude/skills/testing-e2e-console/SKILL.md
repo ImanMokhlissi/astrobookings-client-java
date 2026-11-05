@@ -5,11 +5,17 @@ description: Rules for writing and running end-to-end tests that drive the conso
 
 # End-to-end testing of the console
 
-Run the tests with `./mvnw test -Pe2e`. They need the real API running, and they fail if it is
+Run the tests with `timeout 240 ./mvnw -B -ntp test -Pe2e`. They need the real API running, and they fail if it is
 not (ADR-5).
 
 ## Rules
 
+- **Never wait for input**: never leave the menu waiting for input. Tests inject the
+  `InputStream`. A command that runs the client, such as `exec:java` or `java -jar`, gets its
+  input through stdin: `echo "0" | timeout 240 ./mvnw -B -ntp compile exec:java`.
+- **Time limit on Maven**: wrap every Maven command in `timeout`, as above, and run it in the
+  foreground, with no background polling loop. If a command times out twice on a download, stop
+  and report it.
 - **Tag**: annotate each test class with `@Tag("e2e")`.
 - **Location**: use one class per spec, named after it, such as `LaunchListingE2eTest`, under
   `src/test/java` in the package it exercises.
