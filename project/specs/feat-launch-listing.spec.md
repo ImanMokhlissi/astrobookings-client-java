@@ -1,7 +1,7 @@
 # Launch listing
 
 - **Type**: feat
-- **Status**: verified
+- **Status**: released
 - **Related**: FR1, TR2, TR3, TR4, TR7, TR9
 - **Depends on**: chore-build-setup
 
