@@ -1,7 +1,7 @@
 # Build setup
 
 - **Type**: chore
-- **Status**: draft
+- **Status**: released
 - **Related**: TR1, TR3, TR8
 - **Depends on**: none
 
