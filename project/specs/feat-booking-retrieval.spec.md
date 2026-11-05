@@ -27,7 +27,7 @@
 - **AC6**: IF the user enters something that is not 0 and not a number in the displayed list, THEN the system SHALL ask for the number again without calling the API.
 - **AC7**: IF the API responds 401 to `GET /bookings` or `GET /bookings/:id`, THEN the system SHALL delete the session file and ask the user to register again.
 - **AC8**: IF the API responds to either request with an error other than 401, such as when the chosen booking no longer exists, THEN the system SHALL show the API's error in a readable form and return to the menu.
-- **AC9**: IF the API is not reachable when the system sends `GET /bookings` or `GET /bookings/:id`, THEN the system SHALL show `API not reachable at <url>`, with the configured URL, instead of a stack trace.
+- **AC9**: IF the API is not reachable when the system sends `GET /bookings` or `GET /bookings/:id`, THEN the system SHALL show `API not reachable at <url>`, with the configured URL, instead of a stack trace, and return to the menu.
 - **AC10**: WHEN the user enters 0 at the booking number prompt, the system SHALL cancel the selection and return to the menu without calling `GET /bookings/:id`.
 
 ## Out of scope
