@@ -33,6 +33,7 @@ public final class FakeApiServer {
     private volatile boolean blocking = false;
     private volatile String receivedMethod;
     private volatile String receivedPath;
+    private volatile String receivedRawPath;
     private volatile String receivedAuthorization;
     private volatile String receivedContentType;
 
@@ -94,6 +95,11 @@ public final class FakeApiServer {
         return receivedPath;
     }
 
+    /** The path as it was sent, before any percent-decoding. */
+    public String receivedRawPath() {
+        return receivedRawPath;
+    }
+
     public String receivedAuthorization() {
         return receivedAuthorization;
     }
@@ -135,6 +141,7 @@ public final class FakeApiServer {
     private void recordRequest(HttpExchange exchange) throws IOException {
         receivedMethod = exchange.getRequestMethod();
         receivedPath = exchange.getRequestURI().getPath();
+        receivedRawPath = exchange.getRequestURI().getRawPath();
         receivedAuthorization = exchange.getRequestHeaders().getFirst("Authorization");
         receivedContentType = exchange.getRequestHeaders().getFirst("Content-Type");
         receivedBodies.add(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));

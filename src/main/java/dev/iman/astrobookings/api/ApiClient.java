@@ -27,9 +27,11 @@ import dev.iman.astrobookings.model.User;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
@@ -65,9 +67,7 @@ public final class ApiClient {
     }
 
     public List<Launch> fetchLaunches() {
-        HttpResponse<String> response = send(buildGetRequest(ACTIVITIES_PATH));
-        throwIfFailed(response);
-        return toLaunches(response);
+        return toLaunches(sendExpectingSuccess(buildGetRequest(ACTIVITIES_PATH)));
     }
 
     public Session register(String username, String email, String password) {
@@ -80,28 +80,53 @@ public final class ApiClient {
 
     public Booking createBooking(String token, String launchId, BigInteger seats) {
         String json = toJson(new CreateBookingRequest(launchId, seats));
-        HttpResponse<String> response = send(buildAuthenticatedPostRequest(BOOKINGS_PATH, json, token));
-        throwIfFailed(response);
-        return toBooking(response);
+        HttpResponse<String> response =
+                sendExpectingSuccess(buildAuthenticatedPostRequest(BOOKINGS_PATH, json, token));
+        return toBooking(response, ApiClient::isComplete);
+    }
+
+    public List<Booking> fetchBookings(String token) {
+        return toRetrievedBookings(sendExpectingSuccess(buildAuthenticatedGetRequest(BOOKINGS_PATH, token)));
+    }
+
+    public Booking fetchBooking(String token, String bookingId) {
+        HttpResponse<String> response =
+                sendExpectingSuccess(buildAuthenticatedGetRequest(bookingPathOf(bookingId), token));
+        return toBooking(response, ApiClient::isCompleteWithLaunch);
+    }
+
+    /** The id goes as one path segment, whatever characters the API put in it. */
+    private static String bookingPathOf(String bookingId) {
+        String encodedId = URLEncoder.encode(bookingId, StandardCharsets.UTF_8).replace("+", "%20");
+        return BOOKINGS_PATH + "/" + encodedId;
     }
 
     private Session authenticate(String path, Object requestBody) {
-        HttpResponse<String> response = send(buildPostRequest(path, toJson(requestBody)));
-        throwIfFailed(response);
-        return toSession(response);
+        return toSession(sendExpectingSuccess(buildPostRequest(path, toJson(requestBody))));
     }
 
     private HttpRequest buildGetRequest(String path) {
-        return HttpRequest.newBuilder(urlOf(path)).timeout(requestTimeout).GET().build();
+        return getRequestBuilder(path).build();
+    }
+
+    private HttpRequest buildAuthenticatedGetRequest(String path, String token) {
+        return buildWithToken(getRequestBuilder(path), token);
+    }
+
+    private HttpRequest.Builder getRequestBuilder(String path) {
+        return HttpRequest.newBuilder(urlOf(path)).timeout(requestTimeout).GET();
     }
 
     private HttpRequest buildPostRequest(String path, String json) {
         return postRequestBuilder(path, json).build();
     }
 
-    /** A token that a header cannot hold, such as one with a control character, is a generic error. */
     private HttpRequest buildAuthenticatedPostRequest(String path, String json, String token) {
-        HttpRequest.Builder builder = postRequestBuilder(path, json);
+        return buildWithToken(postRequestBuilder(path, json), token);
+    }
+
+    /** A token that a header cannot hold, such as one with a control character, is a generic error. */
+    private static HttpRequest buildWithToken(HttpRequest.Builder builder, String token) {
         try {
             return builder.header("Authorization", "Bearer " + token).build();
         } catch (IllegalArgumentException e) {
@@ -129,6 +154,12 @@ public final class ApiClient {
                 ? configuredUrl.substring(0, configuredUrl.length() - 1)
                 : configuredUrl;
         return URI.create(base + path);
+    }
+
+    private HttpResponse<String> sendExpectingSuccess(HttpRequest request) {
+        HttpResponse<String> response = send(request);
+        throwIfFailed(response);
+        return response;
     }
 
     private HttpResponse<String> send(HttpRequest request) {
@@ -208,8 +239,8 @@ public final class ApiClient {
         return new Session(authResponse.accessToken(), user.username(), user.email());
     }
 
-    private Booking toBooking(HttpResponse<String> response) {
-        return toBooking(readComplete(response, new TypeReference<BookingResponse>() {}, ApiClient::isComplete));
+    private Booking toBooking(HttpResponse<String> response, Predicate<BookingResponse> isComplete) {
+        return toBooking(readComplete(response, new TypeReference<BookingResponse>() {}, isComplete));
     }
 
     private static boolean isComplete(BookingResponse booking) {
@@ -220,6 +251,19 @@ public final class ApiClient {
                 && hasText(booking.createdAt())
                 && hasText(booking.paymentStatus())
                 && (booking.activity() == null || isComplete(booking.activity()));
+    }
+
+    private List<Booking> toRetrievedBookings(HttpResponse<String> response) {
+        List<BookingResponse> bookings = readComplete(
+                response,
+                new TypeReference<List<BookingResponse>>() {},
+                list -> list.stream().allMatch(ApiClient::isCompleteWithLaunch));
+        return bookings.stream().map(ApiClient::toBooking).toList();
+    }
+
+    /** Only a newly created booking may lack its launch, so a retrieved one must hold it. */
+    private static boolean isCompleteWithLaunch(BookingResponse booking) {
+        return booking != null && booking.activity() != null && isComplete(booking);
     }
 
     private static boolean isComplete(BookingActivityResponse activity) {
