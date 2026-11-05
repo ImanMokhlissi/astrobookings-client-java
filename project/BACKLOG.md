@@ -28,3 +28,5 @@ Improvements that block nothing. Add them here and carry on with the current wor
   the input.
 - **ADD, ADR-10**: it lists three `ApiFailure` subclasses, while `feat-session` adds
   `InvalidCredentialsFailure` and `SessionRejectedFailure`, raised only by `service`.
+- **`ConsoleMenu` size**: at about 275 lines, it could split its launch display and session flows
+  into separate views.
