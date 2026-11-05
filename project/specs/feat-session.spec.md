@@ -1,7 +1,7 @@
 # Session management
 
 - **Type**: feat
-- **Status**: planned
+- **Status**: in-progress
 - **Related**: FR2, FR3, FR4, FR5, TR5
 - **Depends on**: chore-build-setup, feat-launch-listing
 
