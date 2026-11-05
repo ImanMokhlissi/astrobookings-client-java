@@ -12,48 +12,48 @@ no checkboxes because the tester does not change this plan.
 
 Covers: AC1, AC6
 
-- [ ] Add `dev.iman.astrobookings.Main` in the root package, outside the layers. `main` delegates to a `run` method that returns exit code 0, in the shape `coding-java` describes. It wires nothing and prints nothing.
-- [ ] Add the untagged `MainTest` in the same package, with `should_return_exit_code_0_when_run_without_the_api`. It calls `run` and never `main`, because `main` calls `System.exit`.
+- [x] Add `dev.iman.astrobookings.Main` in the root package, outside the layers. `main` delegates to a `run` method that returns exit code 0, in the shape `coding-java` describes. It wires nothing and prints nothing.
+- [x] Add the untagged `MainTest` in the same package, with `should_return_exit_code_0_when_run_without_the_api`. It calls `run` and never `main`, because `main` calls `System.exit`.
 
 ### 2. Create the five layer packages
 
 Covers: AC2
 
-- [ ] Add a `package-info.java` to each of `cli`, `service`, `api`, `model` and `session` under `dev.iman.astrobookings`. Git does not track empty folders, so without a file the packages do not exist in a clean checkout. Add no types.
+- [x] Add a `package-info.java` to each of `cli`, `service`, `api`, `model` and `session` under `dev.iman.astrobookings`. Git does not track empty folders, so without a file the packages do not exist in a clean checkout. Add no types.
 
 ### 3. Keep the tests with the `e2e` tag apart
 
 Covers: AC6, AC7, AC8
 
-- [ ] In `pom.xml`, configure `maven-surefire-plugin` to exclude the `e2e` tag by default (ADR-9).
-- [ ] In `pom.xml`, add a profile `e2e` that selects only the `e2e` tag and also lifts the default exclusion. If the exclusion stays, the profile selects nothing and the run still passes with no tests.
-- [ ] Run `./mvnw test` and check that `MainTest` still runs. Do not add a test with the `e2e` tag: the tester writes it.
+- [x] In `pom.xml`, configure `maven-surefire-plugin` to exclude the `e2e` tag by default (ADR-9).
+- [x] In `pom.xml`, add a profile `e2e` that selects only the `e2e` tag and also lifts the default exclusion. If the exclusion stays, the profile selects nothing and the run still passes with no tests.
+- [x] Run `./mvnw test` and check that `MainTest` still runs. Do not add a test with the `e2e` tag: the tester writes it.
 
 ### 4. Add Jackson
 
 Covers: AC9
 
-- [ ] In `pom.xml`, add `jackson-databind` with the compile scope, its version in a property like `junit.version`. It stays the only dependency outside the test scope.
+- [x] In `pom.xml`, add `jackson-databind` with the compile scope, its version in a property like `junit.version`. It stays the only dependency outside the test scope.
 
 ### 5. Run the client from Maven
 
 Covers: AC3
 
-- [ ] In `pom.xml`, add `exec-maven-plugin` with `dev.iman.astrobookings.Main` as its main class, configured at plugin level so that a direct `exec:java` picks it up (ADR-6).
-- [ ] Make `exec:java` survive the `System.exit` in `main`, which would otherwise stop Maven's JVM before the build ends. Use the plugin's `blockSystemExit` option, in a version that has it.
-- [ ] Run `./mvnw compile exec:java` without `-Dexec.mainClass` and check that it ends with `BUILD SUCCESS`.
+- [x] In `pom.xml`, add `exec-maven-plugin` with `dev.iman.astrobookings.Main` as its main class, configured at plugin level so that a direct `exec:java` picks it up (ADR-6).
+- [x] Make `exec:java` survive the `System.exit` in `main`, which would otherwise stop Maven's JVM before the build ends. Use the plugin's `blockSystemExit` option, in a version that has it.
+- [x] Run `./mvnw compile exec:java` without `-Dexec.mainClass` and check that it ends with `BUILD SUCCESS`.
 
 ### 6. Package the executable jar
 
 Covers: AC4, AC5
 
-- [ ] In `pom.xml`, add `maven-shade-plugin` in the `package` phase, with `dev.iman.astrobookings.Main` as the jar's main class (ADR-8). Do not enable `minimizeJar`: `Main` does not use Jackson yet, so it would remove the Jackson classes.
-- [ ] Run `./mvnw package`, then `java -jar` on the jar, and check that it exits with code 0.
+- [x] In `pom.xml`, add `maven-shade-plugin` in the `package` phase, with `dev.iman.astrobookings.Main` as the jar's main class (ADR-8). Do not enable `minimizeJar`: `Main` does not use Jackson yet, so it would remove the Jackson classes.
+- [x] Run `./mvnw package`, then `java -jar` on the jar, and check that it exits with code 0.
 
 ## Checks
 
-- [ ] `./mvnw compile` passes.
-- [ ] `./mvnw test` passes.
+- [x] `./mvnw compile` passes.
+- [x] `./mvnw test` passes.
 
 ## Verification
 
