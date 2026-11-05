@@ -10,16 +10,22 @@ import dev.iman.astrobookings.model.ApiErrorFailure;
 import dev.iman.astrobookings.model.ApiFailure;
 import dev.iman.astrobookings.model.ApiNotReachableFailure;
 import dev.iman.astrobookings.model.AuthResponse;
+import dev.iman.astrobookings.model.Booking;
+import dev.iman.astrobookings.model.BookingActivityResponse;
+import dev.iman.astrobookings.model.BookingResponse;
+import dev.iman.astrobookings.model.CreateBookingRequest;
 import dev.iman.astrobookings.model.ErrorResponse;
 import dev.iman.astrobookings.model.FieldError;
 import dev.iman.astrobookings.model.FieldErrorResponse;
 import dev.iman.astrobookings.model.Launch;
+import dev.iman.astrobookings.model.LaunchSummary;
 import dev.iman.astrobookings.model.LoginRequest;
 import dev.iman.astrobookings.model.RegisterRequest;
 import dev.iman.astrobookings.model.Session;
 import dev.iman.astrobookings.model.UnauthorizedFailure;
 import dev.iman.astrobookings.model.User;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -36,6 +42,7 @@ public final class ApiClient {
     private static final String ACTIVITIES_PATH = "/activities";
     private static final String USERS_PATH = "/users";
     private static final String LOGIN_PATH = "/login";
+    private static final String BOOKINGS_PATH = "/bookings";
     private static final String GENERIC_ERROR_MESSAGE = "The API returned an unexpected response.";
     private static final int NO_RESPONSE_STATUS = 0;
     private static final int UNAUTHORIZED_STATUS = 401;
@@ -70,6 +77,13 @@ public final class ApiClient {
         return authenticate(LOGIN_PATH, new LoginRequest(email, password));
     }
 
+    public Booking createBooking(String token, String launchId, BigInteger seats) {
+        String json = toJson(new CreateBookingRequest(launchId, seats));
+        HttpResponse<String> response = send(buildAuthenticatedPostRequest(BOOKINGS_PATH, json, token));
+        throwIfFailed(response);
+        return toBooking(response);
+    }
+
     private Session authenticate(String path, Object requestBody) {
         HttpResponse<String> response = send(buildPostRequest(path, toJson(requestBody)));
         throwIfFailed(response);
@@ -81,11 +95,24 @@ public final class ApiClient {
     }
 
     private HttpRequest buildPostRequest(String path, String json) {
+        return postRequestBuilder(path, json).build();
+    }
+
+    /** A token that a header cannot hold, such as one with a control character, is a generic error. */
+    private HttpRequest buildAuthenticatedPostRequest(String path, String json, String token) {
+        HttpRequest.Builder builder = postRequestBuilder(path, json);
+        try {
+            return builder.header("Authorization", "Bearer " + token).build();
+        } catch (IllegalArgumentException e) {
+            throw new ApiErrorFailure(genericError(NO_RESPONSE_STATUS));
+        }
+    }
+
+    private HttpRequest.Builder postRequestBuilder(String path, String json) {
         return HttpRequest.newBuilder(urlOf(path))
                 .timeout(requestTimeout)
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(json))
-                .build();
+                .POST(HttpRequest.BodyPublishers.ofString(json));
     }
 
     private String toJson(Object requestBody) {
@@ -201,6 +228,67 @@ public final class ApiClient {
     private static Session toSession(AuthResponse authResponse) {
         User user = authResponse.user();
         return new Session(authResponse.accessToken(), user.username(), user.email());
+    }
+
+    private Booking toBooking(HttpResponse<String> response) {
+        return readBookingResponse(response.body())
+                .map(ApiClient::toBooking)
+                .orElseThrow(() -> new ApiErrorFailure(genericError(response.statusCode())));
+    }
+
+    /** An empty result means that the body is not a complete booking. */
+    private Optional<BookingResponse> readBookingResponse(String body) {
+        try {
+            return Optional.ofNullable(mapper.readValue(body, BookingResponse.class))
+                    .filter(ApiClient::isComplete);
+        } catch (JsonProcessingException e) {
+            return Optional.empty();
+        }
+    }
+
+    private static boolean isComplete(BookingResponse booking) {
+        return hasText(booking.id())
+                && hasText(booking.activityId())
+                && hasText(booking.userId())
+                && booking.participants() != null
+                && hasText(booking.createdAt())
+                && hasText(booking.paymentStatus())
+                && (booking.activity() == null || isComplete(booking.activity()));
+    }
+
+    private static boolean isComplete(BookingActivityResponse activity) {
+        return Stream.<Object>of(
+                activity.name(),
+                activity.slug(),
+                activity.price(),
+                activity.date(),
+                activity.duration(),
+                activity.location(),
+                activity.status())
+                .noneMatch(Objects::isNull);
+    }
+
+    private static Booking toBooking(BookingResponse booking) {
+        return new Booking(
+                booking.id(),
+                booking.activityId(),
+                booking.userId(),
+                booking.participants(),
+                booking.createdAt(),
+                booking.paymentId(),
+                booking.paymentStatus(),
+                booking.activity() == null ? null : toLaunchSummary(booking.activity()));
+    }
+
+    private static LaunchSummary toLaunchSummary(BookingActivityResponse activity) {
+        return new LaunchSummary(
+                activity.name(),
+                activity.slug(),
+                activity.price(),
+                activity.date(),
+                activity.duration(),
+                activity.location(),
+                activity.status());
     }
 
     private static boolean hasText(String value) {
