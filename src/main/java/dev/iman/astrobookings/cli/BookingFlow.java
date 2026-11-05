@@ -46,7 +46,7 @@ final class BookingFlow {
 
     private void offerLaunches(List<Launch> launches) {
         if (launches.isEmpty()) {
-            output.println("No launches open for booking.");
+            output.println(ConsoleMenu.NO_OPEN_LAUNCHES_MESSAGE);
             return;
         }
         showNumbered(launches);

@@ -29,6 +29,8 @@ import java.util.Set;
 /** The interactive menu. It runs until the user exits or the input ends. */
 public final class ConsoleMenu {
 
+    static final String NO_OPEN_LAUNCHES_MESSAGE = "No launches open for booking.";
+
     private static final String LIST_LAUNCHES_OPTION = "1";
     private static final String REGISTER_OPTION = "2";
     private static final String LOG_IN_OPTION = "3";
@@ -167,7 +169,7 @@ public final class ConsoleMenu {
 
     private void showLaunches(List<Launch> launches) {
         if (launches.isEmpty()) {
-            output.println("No launches open for booking.");
+            output.println(NO_OPEN_LAUNCHES_MESSAGE);
             return;
         }
         launches.forEach(this::showLaunch);
