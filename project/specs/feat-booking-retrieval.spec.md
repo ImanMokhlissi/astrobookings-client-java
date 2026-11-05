@@ -1,7 +1,7 @@
 # Booking retrieval
 
 - **Type**: feat
-- **Status**: in-progress
+- **Status**: verified
 - **Related**: FR8, FR9, TR6
 - **Depends on**: chore-build-setup, feat-launch-listing, feat-session, feat-booking-creation
 
