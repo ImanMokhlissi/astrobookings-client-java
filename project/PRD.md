@@ -40,7 +40,7 @@
 | ID  | Description                                                                                       | Status      |
 |-----|---------------------------------------------------------------------------------------------------|-------------|
 | TR1 | Console application in Java 21, built with Maven through the Maven Wrapper, with no heavy frameworks. | not-started |
-| TR2 | HTTP calls use `java.net.http.HttpClient` against the API at `http://localhost:3000`.             | not-started |
+| TR2 | HTTP calls use `java.net.http.HttpClient` against the API URL configured with the environment variable `ASTROBOOKINGS_API_URL`, with `http://localhost:3000` as the default. | not-started |
 | TR3 | JSON is handled with Jackson, and API fields not listed in the constraints are ignored.           | not-started |
 | TR4 | The client says "launches" to the user and maps them internally to the API's "activities".        | not-started |
 | TR5 | The token is stored outside the repository in `~/.astrobookings/session.json` and read on startup. | not-started |
@@ -67,6 +67,7 @@
 - `GET /bookings`, `GET /bookings/:id` and `POST /bookings` {activityId, participants} require the token.
 - A booking from `GET /bookings` and `GET /bookings/:id` has id, activityId, userId, participants, createdAt, paymentId, paymentStatus (pending | paid | refunded) and activity {name, slug, price, date, duration, location, status}.
 - `POST /bookings` responds 201 with the booking without the `activity` object, and with paymentStatus "paid".
+- POST /bookings responds 402 'Payment could not be processed' when the mock payment gateway rejects the charge (it fails when price × participants is a multiple of 1000). The client shows this error clearly and no booking is created.
 - The API has no rocket data, so the exercise statement's request to show the rocket cannot be met.
 - Free seats are not exposed, so the client cannot show them or check them in advance. The API enforces capacity with a 400 and "Capacity exceeded. Available: N, Requested: M".
 - The API accepts bookings on draft launches, so the client itself must limit booking to `published` and `confirmed` launches.
