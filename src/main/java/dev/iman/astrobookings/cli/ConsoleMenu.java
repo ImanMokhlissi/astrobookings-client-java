@@ -61,10 +61,14 @@ public final class ConsoleMenu {
     }
 
     private void handleOption(String option) {
-        if (!option.equals(LIST_LAUNCHES_OPTION)) {
+        if (option.equals(LIST_LAUNCHES_OPTION)) {
+            listLaunches();
+        } else {
             output.println("Unknown option. Select one of the options in the menu.");
-            return;
         }
+    }
+
+    private void listLaunches() {
         try {
             showLaunches(launchService.listOpenLaunches());
         } catch (ApiFailure failure) {
