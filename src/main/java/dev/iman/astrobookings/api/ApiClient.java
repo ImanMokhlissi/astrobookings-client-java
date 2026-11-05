@@ -22,6 +22,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 /** The HTTP boundary: every failure leaves this class as an {@link ApiFailure}. */
@@ -30,6 +31,8 @@ public final class ApiClient {
     private static final String ACTIVITIES_PATH = "/activities";
     private static final String GENERIC_ERROR_MESSAGE = "The API returned an unexpected response.";
     private static final int UNAUTHORIZED_STATUS = 401;
+    private static final int FIRST_SUCCESS_STATUS = 200;
+    private static final int LAST_SUCCESS_STATUS = 299;
 
     private final HttpClient httpClient;
     private final String configuredUrl;
@@ -78,21 +81,30 @@ public final class ApiClient {
         if (status == UNAUTHORIZED_STATUS) {
             throw new UnauthorizedFailure(toApiError(status, response.body()));
         }
-        if (status < 200 || status >= 300) {
+        if (!isSuccessful(status)) {
             throw new ApiErrorFailure(toApiError(status, response.body()));
         }
     }
 
+    private static boolean isSuccessful(int status) {
+        return status >= FIRST_SUCCESS_STATUS && status <= LAST_SUCCESS_STATUS;
+    }
+
     private List<Launch> toLaunches(HttpResponse<String> response) {
+        return readActivities(response.body())
+                .map(activities -> activities.stream().map(ApiClient::toLaunch).toList())
+                .orElseThrow(() -> new ApiErrorFailure(genericError(response.statusCode())));
+    }
+
+    /** An empty result means that the body is not a list of complete activities. */
+    private Optional<List<ActivityResponse>> readActivities(String body) {
         try {
             List<ActivityResponse> activities =
-                    mapper.readValue(response.body(), new TypeReference<List<ActivityResponse>>() {});
-            if (activities == null || activities.stream().anyMatch(ApiClient::isIncomplete)) {
-                throw new ApiErrorFailure(genericError(response.statusCode()));
-            }
-            return activities.stream().map(ApiClient::toLaunch).toList();
+                    mapper.readValue(body, new TypeReference<List<ActivityResponse>>() {});
+            return Optional.ofNullable(activities)
+                    .filter(list -> list.stream().noneMatch(ApiClient::isIncomplete));
         } catch (JsonProcessingException e) {
-            throw new ApiErrorFailure(genericError(response.statusCode()));
+            return Optional.empty();
         }
     }
 
