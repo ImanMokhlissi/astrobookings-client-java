@@ -30,11 +30,17 @@ public final class ExampleApiClient {
 
     public List<ExampleRecord> fetchItems() {
         HttpResponse<String> response = send(requestTo("/items").GET().build());
-        return parse(response.body(), new TypeReference<>() {});
+        List<ExampleRecord> items = parse(response, new TypeReference<>() {});
+        if (items.contains(null)) {
+            throw genericError(response.statusCode());
+        }
+        return items;
     }
 
+    /** Appends the path as text, because URI.resolve would drop a path in the configured URL. */
     private HttpRequest.Builder requestTo(String path) {
-        return HttpRequest.newBuilder(baseUrl.resolve(path)).timeout(TIMEOUT);
+        String base = baseUrl.toString().replaceAll("/+$", "");
+        return HttpRequest.newBuilder(URI.create(base + path)).timeout(TIMEOUT);
     }
 
     private HttpResponse<String> send(HttpRequest request) {
@@ -56,7 +62,7 @@ public final class ExampleApiClient {
         if (status == 401) {
             throw new UnauthorizedException();
         }
-        if (status >= 400) {
+        if (status < 200 || status >= 300) {
             throw toApiError(status, response.body());
         }
     }
@@ -64,11 +70,25 @@ public final class ExampleApiClient {
     private ApiErrorException toApiError(int status, String body) {
         try {
             ErrorResponse error = mapper.readValue(body, ErrorResponse.class);
-            String message = error.message() == null ? GENERIC_ERROR : error.message();
-            return new ApiErrorException(status, message, toFieldErrors(error.errors()));
+            if (!isWellFormed(error)) {
+                return genericError(status);
+            }
+            return new ApiErrorException(status, error.message(), toFieldErrors(error.errors()));
         } catch (JsonProcessingException e) {
-            return new ApiErrorException(status, GENERIC_ERROR, List.of());
+            return genericError(status);
         }
+    }
+
+    /** A valid JSON body can still be null, or hold null entries, so readValue is not enough. */
+    private boolean isWellFormed(ErrorResponse error) {
+        if (error == null || error.message() == null || error.message().isBlank()) {
+            return false;
+        }
+        return error.errors() == null || error.errors().stream().allMatch(this::isWellFormed);
+    }
+
+    private boolean isWellFormed(FieldErrorResponse error) {
+        return error != null && error.field() != null && error.message() != null;
     }
 
     private List<FieldError> toFieldErrors(List<FieldErrorResponse> errors) {
@@ -78,12 +98,20 @@ public final class ExampleApiClient {
         return errors.stream().map(e -> new FieldError(e.field(), e.message())).toList();
     }
 
-    private <T> T parse(String body, TypeReference<T> type) {
+    private <T> T parse(HttpResponse<String> response, TypeReference<T> type) {
         try {
-            return mapper.readValue(body, type);
+            T value = mapper.readValue(response.body(), type);
+            if (value == null) {
+                throw genericError(response.statusCode());
+            }
+            return value;
         } catch (JsonProcessingException e) {
-            throw new ApiErrorException(200, GENERIC_ERROR, List.of());
+            throw genericError(response.statusCode());
         }
+    }
+
+    private ApiErrorException genericError(int status) {
+        return new ApiErrorException(status, GENERIC_ERROR, List.of());
     }
 
     /** The API's error format, read only inside this class. */

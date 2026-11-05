@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
-import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
@@ -99,11 +98,12 @@ public final class ExampleMenu {
         }
     }
 
+    /** An input that can no longer be read counts as ended, so the menu closes cleanly. */
     private Optional<String> readLine() {
         try {
             return Optional.ofNullable(input.readLine()).map(String::trim);
         } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            return Optional.empty();
         }
     }
 }
