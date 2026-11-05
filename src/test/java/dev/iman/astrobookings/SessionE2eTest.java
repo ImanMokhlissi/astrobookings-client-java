@@ -32,9 +32,10 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Acceptance criteria of feat-session, against the real API. The login half of AC4 and all of AC9
- * have no test here, because the real API cannot reach them: POST /login always responds 401, and
- * no menu option makes an authenticated call yet. ConsoleMenuTest and SessionServiceTest cover them.
+ * Acceptance criteria of feat-session, against the real API. The login half of AC4 has no test here,
+ * because the real API cannot reach it: POST /login always responds 401. ConsoleMenuTest and
+ * SessionServiceTest cover it. BookingCreationE2eTest covers AC9, because it needs the booking
+ * option's authenticated call.
  */
 @Tag("e2e")
 @Timeout(value = 90, unit = TimeUnit.SECONDS)
