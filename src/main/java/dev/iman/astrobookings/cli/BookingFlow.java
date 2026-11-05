@@ -45,14 +45,8 @@ final class BookingFlow {
             output.println(ConsoleMenu.NO_OPEN_LAUNCHES_MESSAGE);
             return;
         }
-        showNumbered(launches);
+        numberPrompt.showNumbered(launches, BookingFlow::describe);
         chooseLaunch(launches).ifPresent(this::askForSeats);
-    }
-
-    private void showNumbered(List<Launch> launches) {
-        for (int index = 0; index < launches.size(); index++) {
-            output.println((index + 1) + ". " + describe(launches.get(index)));
-        }
     }
 
     private static String describe(Launch launch) {
@@ -62,13 +56,8 @@ final class BookingFlow {
     }
 
     private Optional<Launch> chooseLaunch(List<Launch> launches) {
-        BigInteger lastNumber = BigInteger.valueOf(launches.size());
-        return numberPrompt
-                .promptForNumber(
-                        "Launch number (0 to cancel):",
-                        number -> number.compareTo(lastNumber) <= 0,
-                        "Enter a launch number from the list.")
-                .map(number -> launches.get(number.intValueExact() - 1));
+        return numberPrompt.chooseFromList(
+                "Launch number (0 to cancel):", launches, "Enter a launch number from the list.");
     }
 
     private void askForSeats(Launch launch) {

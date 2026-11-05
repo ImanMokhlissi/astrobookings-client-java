@@ -5,7 +5,6 @@ import dev.iman.astrobookings.model.Booking;
 import dev.iman.astrobookings.model.LaunchSummary;
 import dev.iman.astrobookings.service.BookingService;
 import java.io.PrintStream;
-import java.math.BigInteger;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -32,32 +31,35 @@ final class BookingRetrievalFlow {
     }
 
     void listBookings() {
-        try {
-            showNumbered(bookingService.listBookings());
-        } catch (ApiFailure failure) {
-            showFailure.accept(failure);
-        }
+        runShowingFailures(this::showFreshList);
     }
 
     void viewBooking() {
+        runShowingFailures(this::viewFromFreshList);
+    }
+
+    private void runShowingFailures(Runnable option) {
         try {
-            List<Booking> bookings = bookingService.listBookings();
-            showNumbered(bookings);
-            if (!bookings.isEmpty()) {
-                chooseBooking(bookings).ifPresent(this::showChosenBooking);
-            }
+            option.run();
         } catch (ApiFailure failure) {
             showFailure.accept(failure);
         }
     }
 
-    private void showNumbered(List<Booking> bookings) {
+    private void viewFromFreshList() {
+        List<Booking> bookings = showFreshList();
+        if (!bookings.isEmpty()) {
+            chooseBooking(bookings).ifPresent(this::showChosenBooking);
+        }
+    }
+
+    private List<Booking> showFreshList() {
+        List<Booking> bookings = bookingService.listBookings();
         if (bookings.isEmpty()) {
             output.println("You have no bookings.");
         }
-        for (int index = 0; index < bookings.size(); index++) {
-            output.println((index + 1) + ". " + describe(bookings.get(index)));
-        }
+        numberPrompt.showNumbered(bookings, BookingRetrievalFlow::describe);
+        return bookings;
     }
 
     private static String describe(Booking booking) {
@@ -68,13 +70,8 @@ final class BookingRetrievalFlow {
     }
 
     private Optional<Booking> chooseBooking(List<Booking> bookings) {
-        BigInteger lastNumber = BigInteger.valueOf(bookings.size());
-        return numberPrompt
-                .promptForNumber(
-                        "Booking number (0 to cancel):",
-                        number -> number.compareTo(lastNumber) <= 0,
-                        "Enter a booking number from the list.")
-                .map(number -> bookings.get(number.intValueExact() - 1));
+        return numberPrompt.chooseFromList(
+                "Booking number (0 to cancel):", bookings, "Enter a booking number from the list.");
     }
 
     private void showChosenBooking(Booking chosen) {

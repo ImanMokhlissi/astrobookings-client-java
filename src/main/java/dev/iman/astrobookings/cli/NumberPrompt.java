@@ -2,6 +2,7 @@ package dev.iman.astrobookings.cli;
 
 import java.io.PrintStream;
 import java.math.BigInteger;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -18,6 +19,20 @@ final class NumberPrompt {
     NumberPrompt(Function<String, Optional<String>> promptFor, PrintStream output) {
         this.promptFor = promptFor;
         this.output = output;
+    }
+
+    /** Shows one line for each item, numbered from 1, so that each number points at its item. */
+    <T> void showNumbered(List<T> items, Function<T, String> describe) {
+        for (int index = 0; index < items.size(); index++) {
+            output.println((index + 1) + ". " + describe.apply(items.get(index)));
+        }
+    }
+
+    /** Resolves the entry to the item in a list shown with {@link #showNumbered}. */
+    <T> Optional<T> chooseFromList(String prompt, List<T> items, String invalidEntryMessage) {
+        BigInteger lastNumber = BigInteger.valueOf(items.size());
+        return promptForNumber(prompt, number -> number.compareTo(lastNumber) <= 0, invalidEntryMessage)
+                .map(number -> items.get(number.intValueExact() - 1));
     }
 
     /** Asks until the entry is accepted. An empty result means that it was 0 or that the input ended. */
