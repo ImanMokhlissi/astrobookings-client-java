@@ -34,3 +34,12 @@ Improvements that block nothing. Add them here and carry on with the current wor
 - **Fractional launches block booking**: until `fix-launch-parsing-robustness` is built, one launch
   with a fractional value makes `GET /activities` fail, so the booking option shows the generic
   error too.
+- **Fractional seats block the bookings list**: the API accepts `participants: 1.5`, but
+  `BookingResponse.participants` is an `Integer`. One such booking makes options 6 and 7 show the
+  generic error for that customer, which read strictly conflicts with AC1 of
+  `feat-booking-retrieval`. A test pins this behaviour. The client itself only sends whole seats.
+- **Booking id `..`**: `ApiClient` encodes the id as one path segment, but dots stay as they are, so
+  an id of exactly `..` is not handled or tested. The API's ids have the form `booking-N`.
+- **PRD, known limitations**: the `POST /login` entry names only the services being created before
+  `loadAllData()`. Also, `routes/auth.ts` and `routes/users.ts` each create their own `UserService`,
+  so a user registered during the run cannot log in either.
