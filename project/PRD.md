@@ -42,7 +42,7 @@
 | TR1 | Console application in Java 21, built with Maven through the Maven Wrapper, with no heavy frameworks. | not-started |
 | TR2 | HTTP calls use `java.net.http.HttpClient` against the API URL configured with the environment variable `ASTROBOOKINGS_API_URL`, with `http://localhost:3000` as the default. | not-started |
 | TR3 | JSON is handled with Jackson, and API fields not listed in the constraints are ignored.           | not-started |
-| TR4 | The client says "launches" to the user and maps them internally to the API's "activities".        | not-started |
+| TR4 | The client says "launches" to the user and maps them internally to the API's "activities". Exception: API error messages are shown verbatim, so they may say 'activity' (see ADR-3). | not-started |
 | TR5 | The token is stored outside the repository in `~/.astrobookings/session.json` and read on startup. | not-started |
 | TR6 | Booking requests send the token in an `Authorization: Bearer <token>` header.                     | not-started |
 | TR7 | API errors in the format `{message, errors:[{field, message}]}` are shown to the user in a readable form. | not-started |
