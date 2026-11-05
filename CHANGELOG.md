@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-06
+
+### Added
+
+- Customers can list their bookings from the menu, in a numbered list with the id, launch name, number of seats and payment status of each one.
+- Customers can view a single booking by choosing its number from that list, and see its seats, creation date, payment data and launch details.
+- Customers can enter 0 at the booking number prompt to cancel, and are asked again when the number is not valid.
+- Customers with no session are told to register or log in before checking their bookings, and are told when they have no bookings.
+
 ## [0.3.0] - 2026-11-05
 
 ### Added

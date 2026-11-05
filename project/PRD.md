@@ -32,8 +32,8 @@
 | FR5 | The user whose session the API rejects with a 401 is asked to register again.                    | done        |
 | FR6 | The user can book a chosen number of seats on a published or confirmed launch.                   | done        |
 | FR7 | The user who requests more seats than are free sees the available and requested numbers.         | done        |
-| FR8 | The user can list their bookings and see the `paymentStatus` of each one.                        | in-progress |
-| FR9 | The user can view the details of a single booking, including its `paymentStatus`.                | in-progress |
+| FR8 | The user can list their bookings and see the `paymentStatus` of each one.                        | done        |
+| FR9 | The user can view the details of a single booking, including its `paymentStatus`.                | done        |
 
 ## Technical requirements
 
@@ -44,7 +44,7 @@
 | TR3 | JSON is handled with Jackson, and API fields not listed in the constraints are ignored.           | done        |
 | TR4 | The client says "launches" to the user and maps them internally to the API's "activities". Exception: API error messages are shown verbatim, so they may say 'activity' (see ADR-3). | done        |
 | TR5 | The token is stored outside the repository in `~/.astrobookings/session.json` and read on startup. | done        |
-| TR6 | Requests to protected endpoints (all /bookings calls) send `Authorization: Bearer <token>`.       | in-progress |
+| TR6 | Requests to protected endpoints (all /bookings calls) send `Authorization: Bearer <token>`.       | done        |
 | TR7 | API errors in the format `{message, errors:[{field, message}]}` are shown to the user in a readable form. | done        |
 | TR8 | Tests are written with JUnit 5 and run with `./mvnw test`.                                        | done        |
 | TR9 | If the API is not running, the client shows `API not reachable at <url>`, with the configured URL, instead of a stack trace. | done        |
