@@ -61,7 +61,7 @@
 - The console interface is in English.
 - `GET /activities` is public and provides id, name, slug, price, date, duration, location, minParticipants, maxParticipants and status.
 - The launch list shows only `published` and `confirmed` launches.
-- `POST /users` takes {username, email, password, terms:true} and returns {user, accessToken}. The token expires after 24 h.
+- `POST /users` takes {username, email, password, terms:true} and returns {user, accessToken}. The client uses the `username` and `email` fields of `user`. The token expires after 24 h.
 - A repeated email responds 400 "Email is already registered" with `errors[0].field` = "email", and the client then asks for another email.
 - `POST /login` {email, password} would return {user, accessToken}, like registration, but today it always responds 401 "Invalid email or password". The working session token therefore comes from registration.
 - `GET /bookings`, `GET /bookings/:id` and `POST /bookings` {activityId, participants} require the token.
