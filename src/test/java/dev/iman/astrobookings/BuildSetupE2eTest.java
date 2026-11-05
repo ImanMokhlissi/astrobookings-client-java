@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Tagged test that AC6, AC7 and AC8 of chore-build-setup observe in the console output of Maven.
- * It needs no API, because Main makes no HTTP calls yet.
+ * It needs no API, because its input exits the menu before any HTTP call.
  */
 @Tag("e2e")
 class BuildSetupE2eTest {
