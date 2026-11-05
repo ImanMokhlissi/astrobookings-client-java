@@ -1,7 +1,7 @@
 # Booking creation
 
 - **Type**: feat
-- **Status**: in-progress
+- **Status**: verified
 - **Related**: FR6, FR7, TR6
 - **Depends on**: chore-build-setup, feat-launch-listing, feat-session
 
