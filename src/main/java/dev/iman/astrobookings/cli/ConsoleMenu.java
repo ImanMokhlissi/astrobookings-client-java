@@ -32,6 +32,7 @@ public final class ConsoleMenu {
     private static final String LOG_OUT_OPTION = "4";
     private static final String EXIT_OPTION = "0";
     private static final String EMAIL_FIELD = "email";
+    private static final String EMAIL_PROMPT = "Email:";
     private static final String PASSWORD_PROMPT = "Password:";
     private static final Set<String> YES_ANSWERS = Set.of("y", "yes");
 
@@ -72,7 +73,7 @@ public final class ConsoleMenu {
         loadSavedSession();
         while (true) {
             showMenu();
-            Optional<String> option = readOption();
+            Optional<String> option = readTrimmedLine();
             if (option.isEmpty() || option.get().equals(EXIT_OPTION)) {
                 return;
             }
@@ -105,7 +106,7 @@ public final class ConsoleMenu {
     }
 
     /** An empty result means that the input ended, which a read error also counts as. */
-    private Optional<String> readOption() {
+    private Optional<String> readTrimmedLine() {
         return readRawLine().map(String::trim);
     }
 
@@ -119,7 +120,11 @@ public final class ConsoleMenu {
 
     private Optional<String> promptFor(String prompt) {
         output.println(prompt);
-        return readOption();
+        return readTrimmedLine();
+    }
+
+    private Optional<String> promptForPassword() {
+        return passwordPrompt.readPassword(PASSWORD_PROMPT);
     }
 
     /** Has no trim, so that the password stays as typed. */
@@ -168,8 +173,8 @@ public final class ConsoleMenu {
 
     private void register() {
         Optional<String> username = promptFor("Username:");
-        Optional<String> email = username.flatMap(value -> promptFor("Email:"));
-        Optional<String> password = email.flatMap(value -> passwordPrompt.readPassword(PASSWORD_PROMPT));
+        Optional<String> email = username.flatMap(value -> promptFor(EMAIL_PROMPT));
+        Optional<String> password = email.flatMap(value -> promptForPassword());
         Optional<String> termsAnswer = password.flatMap(value -> promptFor("Do you accept the terms? (y/n):"));
         if (termsAnswer.isEmpty()) {
             return;
@@ -216,8 +221,8 @@ public final class ConsoleMenu {
     }
 
     private void logIn() {
-        Optional<String> email = promptFor("Email:");
-        Optional<String> password = email.flatMap(value -> passwordPrompt.readPassword(PASSWORD_PROMPT));
+        Optional<String> email = promptFor(EMAIL_PROMPT);
+        Optional<String> password = email.flatMap(value -> promptForPassword());
         if (password.isPresent()) {
             sendLogin(email.get(), password.get());
         }
