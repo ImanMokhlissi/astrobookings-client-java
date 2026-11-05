@@ -22,11 +22,14 @@ import java.math.BigInteger;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class ApiClientTest {
@@ -45,6 +48,7 @@ class ApiClientTest {
             {"name":"Moon","slug":"moon","price":158.50,"date":"2026-12-20","duration":90,
              "location":"Kourou","status":"published"}
             """;
+    private static final String RETRIEVED_BOOKING = bookingBodyWithActivity(BOOKING_ACTIVITY);
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private FakeApiServer fakeApi;
@@ -569,6 +573,224 @@ class ApiClientTest {
 
         assertEquals(new ApiError(0, GENERIC_MESSAGE, List.of()), failure.apiError());
         assertEquals(0, fakeApi.receivedRequests());
+    }
+
+    @Test
+    void should_send_a_get_with_the_token_as_a_bearer_header_when_fetching_the_bookings() {
+        apiClient(fakeApi.url()).fetchBookings("token-1");
+
+        assertEquals("GET", fakeApi.receivedMethod());
+        assertEquals("/bookings", fakeApi.receivedPath());
+        assertEquals("Bearer token-1", fakeApi.receivedAuthorization());
+    }
+
+    @Test
+    void should_return_the_bookings_in_the_api_order_with_their_launch_summary_when_fetching_the_bookings() {
+        fakeApi.respondWith(200, "[" + RETRIEVED_BOOKING + "," + RETRIEVED_BOOKING.replace("booking-1", "booking-2") + "]");
+        LaunchSummary moon = new LaunchSummary(
+                "Moon", "moon", new BigDecimal("158.50"), "2026-12-20", new BigDecimal("90"), "Kourou", "published");
+
+        List<Booking> bookings = apiClient(fakeApi.url()).fetchBookings("token-1");
+
+        assertEquals(
+                List.of(
+                        new Booking("booking-1", "launch-1", "user-1", 2, "2026-11-05T10:00:00.000Z", "payment-1", "paid", moon),
+                        new Booking("booking-2", "launch-1", "user-1", 2, "2026-11-05T10:00:00.000Z", "payment-1", "paid", moon)),
+                bookings);
+    }
+
+    @Test
+    void should_return_no_bookings_when_the_list_is_empty() {
+        fakeApi.respondWith(200, "[]");
+
+        assertEquals(List.of(), apiClient(fakeApi.url()).fetchBookings("token-1"));
+    }
+
+    @Test
+    void should_keep_a_payment_status_the_client_does_not_know_when_fetching_the_bookings() {
+        fakeApi.respondWith(200, "[" + RETRIEVED_BOOKING.replace("\"paid\"", "\"Under Review\"") + "]");
+
+        List<Booking> bookings = apiClient(fakeApi.url()).fetchBookings("token-1");
+
+        assertEquals("Under Review", bookings.get(0).paymentStatus());
+    }
+
+    @Test
+    void should_keep_a_missing_payment_id_as_null_when_fetching_the_bookings() {
+        fakeApi.respondWith(200, "[" + RETRIEVED_BOOKING.replace("\"paymentId\":\"payment-1\",", "") + "]");
+
+        List<Booking> bookings = apiClient(fakeApi.url()).fetchBookings("token-1");
+
+        assertNull(bookings.get(0).paymentId());
+    }
+
+    @Test
+    void should_keep_a_fractional_duration_when_fetching_the_bookings() {
+        fakeApi.respondWith(200, "[" + RETRIEVED_BOOKING.replace("\"duration\":90", "\"duration\":1.5") + "]");
+
+        List<Booking> bookings = apiClient(fakeApi.url()).fetchBookings("token-1");
+
+        assertEquals(new BigDecimal("1.5"), bookings.get(0).launch().duration());
+    }
+
+    @ParameterizedTest
+    @MethodSource("malformedBookingLists")
+    void should_fail_with_a_generic_error_when_the_bookings_response_is_malformed(String body) {
+        fakeApi.respondWith(200, body);
+        ApiClient apiClient = apiClient(fakeApi.url());
+
+        ApiErrorFailure failure = assertThrows(ApiErrorFailure.class, () -> apiClient.fetchBookings("token-1"));
+
+        assertEquals(new ApiError(200, GENERIC_MESSAGE, List.of()), failure.apiError());
+    }
+
+    @Test
+    void should_request_the_chosen_id_with_the_token_as_a_bearer_header_when_fetching_a_booking() {
+        fakeApi.respondWith(200, RETRIEVED_BOOKING);
+
+        apiClient(fakeApi.url()).fetchBooking("token-1", "booking-1");
+
+        assertEquals("GET", fakeApi.receivedMethod());
+        assertEquals("/bookings/booking-1", fakeApi.receivedPath());
+        assertEquals("Bearer token-1", fakeApi.receivedAuthorization());
+    }
+
+    @Test
+    void should_return_the_booking_with_its_launch_summary_when_fetching_a_booking() {
+        fakeApi.respondWith(200, RETRIEVED_BOOKING);
+
+        Booking booking = apiClient(fakeApi.url()).fetchBooking("token-1", "booking-1");
+
+        assertEquals(
+                new Booking(
+                        "booking-1",
+                        "launch-1",
+                        "user-1",
+                        2,
+                        "2026-11-05T10:00:00.000Z",
+                        "payment-1",
+                        "paid",
+                        new LaunchSummary("Moon", "moon", new BigDecimal("158.50"), "2026-12-20", new BigDecimal("90"), "Kourou", "published")),
+                booking);
+    }
+
+    @Test
+    void should_keep_a_fractional_duration_when_fetching_a_booking() {
+        fakeApi.respondWith(200, RETRIEVED_BOOKING.replace("\"duration\":90", "\"duration\":1.5"));
+
+        Booking booking = apiClient(fakeApi.url()).fetchBooking("token-1", "booking-1");
+
+        assertEquals(new BigDecimal("1.5"), booking.launch().duration());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"a b, /bookings/a%20b", "a?b, /bookings/a%3Fb", "a/b, /bookings/a%2Fb"})
+    void should_encode_the_id_as_one_path_segment_when_fetching_a_booking(String bookingId, String expectedRawPath) {
+        fakeApi.respondWith(200, RETRIEVED_BOOKING);
+
+        apiClient(fakeApi.url()).fetchBooking("token-1", bookingId);
+
+        assertEquals(expectedRawPath, fakeApi.receivedRawPath());
+    }
+
+    @ParameterizedTest
+    @MethodSource("malformedRetrievedBookings")
+    void should_fail_with_a_generic_error_when_the_fetched_booking_response_is_malformed(String body) {
+        fakeApi.respondWith(200, body);
+        ApiClient apiClient = apiClient(fakeApi.url());
+
+        ApiErrorFailure failure =
+                assertThrows(ApiErrorFailure.class, () -> apiClient.fetchBooking("token-1", "booking-1"));
+
+        assertEquals(new ApiError(200, GENERIC_MESSAGE, List.of()), failure.apiError());
+    }
+
+    @ParameterizedTest
+    @EnumSource(BookingRequest.class)
+    void should_fail_as_unauthorized_when_the_booking_request_responds_401(BookingRequest request) {
+        fakeApi.respondWith(401, "{\"message\":\"Unauthorized\",\"errors\":[]}");
+        ApiClient apiClient = apiClient(fakeApi.url());
+
+        UnauthorizedFailure failure =
+                assertThrows(UnauthorizedFailure.class, () -> request.sendWith(apiClient, "token-1"));
+
+        assertEquals(new ApiError(401, "Unauthorized", List.of()), failure.apiError());
+    }
+
+    @ParameterizedTest
+    @EnumSource(BookingRequest.class)
+    void should_keep_the_status_and_message_when_the_booking_request_responds_with_an_error(BookingRequest request) {
+        fakeApi.respondWith(404, "{\"message\":\"Booking not found\",\"errors\":[]}");
+        ApiClient apiClient = apiClient(fakeApi.url());
+
+        ApiErrorFailure failure = assertThrows(ApiErrorFailure.class, () -> request.sendWith(apiClient, "token-1"));
+
+        assertEquals(new ApiError(404, "Booking not found", List.of()), failure.apiError());
+    }
+
+    @ParameterizedTest
+    @EnumSource(BookingRequest.class)
+    void should_fail_as_not_reachable_when_the_booking_request_finds_the_api_down(BookingRequest request) {
+        fakeApi.stop();
+        ApiClient apiClient = apiClient(fakeApi.url());
+
+        ApiNotReachableFailure failure =
+                assertThrows(ApiNotReachableFailure.class, () -> request.sendWith(apiClient, "token-1"));
+
+        assertEquals(fakeApi.url(), failure.url());
+    }
+
+    @ParameterizedTest
+    @EnumSource(BookingRequest.class)
+    void should_fail_with_a_generic_error_when_the_token_of_the_booking_request_cannot_be_sent_in_a_header(
+            BookingRequest request) {
+        ApiClient apiClient = apiClient(fakeApi.url());
+
+        ApiErrorFailure failure = assertThrows(ApiErrorFailure.class, () -> request.sendWith(apiClient, "token\n1"));
+
+        assertEquals(new ApiError(0, GENERIC_MESSAGE, List.of()), failure.apiError());
+        assertEquals(0, fakeApi.receivedRequests());
+    }
+
+    /** The two authenticated reads, so that a failure test runs for both. */
+    enum BookingRequest {
+        LIST_BOOKINGS {
+            @Override
+            void sendWith(ApiClient apiClient, String token) {
+                apiClient.fetchBookings(token);
+            }
+        },
+        ONE_BOOKING {
+            @Override
+            void sendWith(ApiClient apiClient, String token) {
+                apiClient.fetchBooking(token, "booking-1");
+            }
+        };
+
+        abstract void sendWith(ApiClient apiClient, String token);
+    }
+
+    static Stream<String> malformedBookingLists() {
+        return Stream.of(
+                "<html>",
+                "null",
+                "{}",
+                RETRIEVED_BOOKING,
+                "[null]",
+                "[" + BOOKING_BODY + "]",
+                "[" + RETRIEVED_BOOKING.replace("\"name\":", "\"other\":") + "]",
+                "[" + RETRIEVED_BOOKING.replace("\"participants\":2", "\"participants\":1.5") + "]",
+                "[" + RETRIEVED_BOOKING + ",null]");
+    }
+
+    static Stream<String> malformedRetrievedBookings() {
+        return Stream.of(
+                "<html>",
+                "null",
+                "[]",
+                BOOKING_BODY,
+                RETRIEVED_BOOKING.replace("\"name\":", "\"other\":"),
+                RETRIEVED_BOOKING.replace("\"participants\":2", "\"participants\":1.5"));
     }
 
     private Booking createBooking() {
