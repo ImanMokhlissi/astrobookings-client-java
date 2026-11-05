@@ -67,9 +67,7 @@ public final class ApiClient {
     }
 
     public List<Launch> fetchLaunches() {
-        HttpResponse<String> response = send(buildGetRequest(ACTIVITIES_PATH));
-        throwIfFailed(response);
-        return toLaunches(response);
+        return toLaunches(sendExpectingSuccess(buildGetRequest(ACTIVITIES_PATH)));
     }
 
     public Session register(String username, String email, String password) {
@@ -82,21 +80,19 @@ public final class ApiClient {
 
     public Booking createBooking(String token, String launchId, BigInteger seats) {
         String json = toJson(new CreateBookingRequest(launchId, seats));
-        HttpResponse<String> response = send(buildAuthenticatedPostRequest(BOOKINGS_PATH, json, token));
-        throwIfFailed(response);
-        return toBooking(response);
+        HttpResponse<String> response =
+                sendExpectingSuccess(buildAuthenticatedPostRequest(BOOKINGS_PATH, json, token));
+        return toBooking(response, ApiClient::isComplete);
     }
 
     public List<Booking> fetchBookings(String token) {
-        HttpResponse<String> response = send(buildAuthenticatedGetRequest(BOOKINGS_PATH, token));
-        throwIfFailed(response);
-        return toRetrievedBookings(response);
+        return toRetrievedBookings(sendExpectingSuccess(buildAuthenticatedGetRequest(BOOKINGS_PATH, token)));
     }
 
     public Booking fetchBooking(String token, String bookingId) {
-        HttpResponse<String> response = send(buildAuthenticatedGetRequest(bookingPathOf(bookingId), token));
-        throwIfFailed(response);
-        return toRetrievedBooking(response);
+        HttpResponse<String> response =
+                sendExpectingSuccess(buildAuthenticatedGetRequest(bookingPathOf(bookingId), token));
+        return toBooking(response, ApiClient::isCompleteWithLaunch);
     }
 
     /** The id goes as one path segment, whatever characters the API put in it. */
@@ -106,9 +102,7 @@ public final class ApiClient {
     }
 
     private Session authenticate(String path, Object requestBody) {
-        HttpResponse<String> response = send(buildPostRequest(path, toJson(requestBody)));
-        throwIfFailed(response);
-        return toSession(response);
+        return toSession(sendExpectingSuccess(buildPostRequest(path, toJson(requestBody))));
     }
 
     private HttpRequest buildGetRequest(String path) {
@@ -160,6 +154,12 @@ public final class ApiClient {
                 ? configuredUrl.substring(0, configuredUrl.length() - 1)
                 : configuredUrl;
         return URI.create(base + path);
+    }
+
+    private HttpResponse<String> sendExpectingSuccess(HttpRequest request) {
+        HttpResponse<String> response = send(request);
+        throwIfFailed(response);
+        return response;
     }
 
     private HttpResponse<String> send(HttpRequest request) {
@@ -239,8 +239,8 @@ public final class ApiClient {
         return new Session(authResponse.accessToken(), user.username(), user.email());
     }
 
-    private Booking toBooking(HttpResponse<String> response) {
-        return toBooking(readComplete(response, new TypeReference<BookingResponse>() {}, ApiClient::isComplete));
+    private Booking toBooking(HttpResponse<String> response, Predicate<BookingResponse> isComplete) {
+        return toBooking(readComplete(response, new TypeReference<BookingResponse>() {}, isComplete));
     }
 
     private static boolean isComplete(BookingResponse booking) {
@@ -259,10 +259,6 @@ public final class ApiClient {
                 new TypeReference<List<BookingResponse>>() {},
                 list -> list.stream().allMatch(ApiClient::isCompleteWithLaunch));
         return bookings.stream().map(ApiClient::toBooking).toList();
-    }
-
-    private Booking toRetrievedBooking(HttpResponse<String> response) {
-        return toBooking(readComplete(response, new TypeReference<BookingResponse>() {}, ApiClient::isCompleteWithLaunch));
     }
 
     /** Only a newly created booking may lack its launch, so a retrieved one must hold it. */
