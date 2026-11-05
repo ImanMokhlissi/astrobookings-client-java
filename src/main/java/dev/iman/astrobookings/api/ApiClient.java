@@ -34,6 +34,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 /** The HTTP boundary: every failure leaves this class as an {@link ApiFailure}. */
@@ -156,25 +157,15 @@ public final class ApiClient {
     }
 
     private List<Launch> toLaunches(HttpResponse<String> response) {
-        return readActivities(response.body())
-                .map(activities -> activities.stream().map(ApiClient::toLaunch).toList())
-                .orElseThrow(() -> new ApiErrorFailure(genericError(response.statusCode())));
+        List<ActivityResponse> activities = readComplete(
+                response,
+                new TypeReference<List<ActivityResponse>>() {},
+                list -> list.stream().allMatch(ApiClient::isComplete));
+        return activities.stream().map(ApiClient::toLaunch).toList();
     }
 
-    /** An empty result means that the body is not a list of complete activities. */
-    private Optional<List<ActivityResponse>> readActivities(String body) {
-        try {
-            List<ActivityResponse> activities =
-                    mapper.readValue(body, new TypeReference<List<ActivityResponse>>() {});
-            return Optional.ofNullable(activities)
-                    .filter(list -> list.stream().noneMatch(ApiClient::isIncomplete));
-        } catch (JsonProcessingException e) {
-            return Optional.empty();
-        }
-    }
-
-    private static boolean isIncomplete(ActivityResponse activity) {
-        return activity == null || Stream.<Object>of(
+    private static boolean isComplete(ActivityResponse activity) {
+        return activity != null && noneIsNull(
                 activity.id(),
                 activity.name(),
                 activity.slug(),
@@ -184,8 +175,7 @@ public final class ApiClient {
                 activity.location(),
                 activity.minParticipants(),
                 activity.maxParticipants(),
-                activity.status())
-                .anyMatch(Objects::isNull);
+                activity.status());
     }
 
     private static Launch toLaunch(ActivityResponse activity) {
@@ -203,19 +193,7 @@ public final class ApiClient {
     }
 
     private Session toSession(HttpResponse<String> response) {
-        return readAuthResponse(response.body())
-                .map(ApiClient::toSession)
-                .orElseThrow(() -> new ApiErrorFailure(genericError(response.statusCode())));
-    }
-
-    /** An empty result means that the body is not a complete authentication response. */
-    private Optional<AuthResponse> readAuthResponse(String body) {
-        try {
-            return Optional.ofNullable(mapper.readValue(body, AuthResponse.class))
-                    .filter(ApiClient::isComplete);
-        } catch (JsonProcessingException e) {
-            return Optional.empty();
-        }
+        return toSession(readComplete(response, new TypeReference<AuthResponse>() {}, ApiClient::isComplete));
     }
 
     private static boolean isComplete(AuthResponse authResponse) {
@@ -231,19 +209,7 @@ public final class ApiClient {
     }
 
     private Booking toBooking(HttpResponse<String> response) {
-        return readBookingResponse(response.body())
-                .map(ApiClient::toBooking)
-                .orElseThrow(() -> new ApiErrorFailure(genericError(response.statusCode())));
-    }
-
-    /** An empty result means that the body is not a complete booking. */
-    private Optional<BookingResponse> readBookingResponse(String body) {
-        try {
-            return Optional.ofNullable(mapper.readValue(body, BookingResponse.class))
-                    .filter(ApiClient::isComplete);
-        } catch (JsonProcessingException e) {
-            return Optional.empty();
-        }
+        return toBooking(readComplete(response, new TypeReference<BookingResponse>() {}, ApiClient::isComplete));
     }
 
     private static boolean isComplete(BookingResponse booking) {
@@ -257,15 +223,14 @@ public final class ApiClient {
     }
 
     private static boolean isComplete(BookingActivityResponse activity) {
-        return Stream.<Object>of(
+        return noneIsNull(
                 activity.name(),
                 activity.slug(),
                 activity.price(),
                 activity.date(),
                 activity.duration(),
                 activity.location(),
-                activity.status())
-                .noneMatch(Objects::isNull);
+                activity.status());
     }
 
     private static Booking toBooking(BookingResponse booking) {
@@ -295,21 +260,36 @@ public final class ApiClient {
         return value != null && !value.isBlank();
     }
 
-    private ApiError toApiError(int status, String body) {
+    private static boolean noneIsNull(Object... values) {
+        return Stream.of(values).noneMatch(Objects::isNull);
+    }
+
+    /** A 2xx body that cannot be read or is not complete becomes a generic error. */
+    private <T> T readComplete(
+            HttpResponse<String> response, TypeReference<T> bodyType, Predicate<T> isComplete) {
+        return readJson(response.body(), bodyType)
+                .filter(isComplete)
+                .orElseThrow(() -> new ApiErrorFailure(genericError(response.statusCode())));
+    }
+
+    /** An empty result means that the body is not valid JSON of this type, or is the literal null. */
+    private <T> Optional<T> readJson(String body, TypeReference<T> bodyType) {
         try {
-            ErrorResponse error = mapper.readValue(body, ErrorResponse.class);
-            if (!isWellFormed(error)) {
-                return genericError(status);
-            }
-            return new ApiError(status, error.message(), toFieldErrors(error.errors()));
+            return Optional.ofNullable(mapper.readValue(body, bodyType));
         } catch (JsonProcessingException e) {
-            return genericError(status);
+            return Optional.empty();
         }
     }
 
+    private ApiError toApiError(int status, String body) {
+        return readJson(body, new TypeReference<ErrorResponse>() {})
+                .filter(ApiClient::isWellFormed)
+                .map(error -> new ApiError(status, error.message(), toFieldErrors(error.errors())))
+                .orElseGet(() -> genericError(status));
+    }
+
     private static boolean isWellFormed(ErrorResponse error) {
-        return error != null
-                && hasText(error.message())
+        return hasText(error.message())
                 && (error.errors() == null || error.errors().stream().allMatch(ApiClient::isWellFormed));
     }
 
