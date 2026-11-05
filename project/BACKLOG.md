@@ -11,8 +11,8 @@ Improvements that block nothing. Add them here and carry on with the current wor
 
 ## Improvements
 
-- **Booking specs**: `feat-booking-creation` and `feat-booking-retrieval` show `duration` through a
-  DTO with no code yet, and should accept fractional values when they are built.
+- **Booking specs**: `feat-booking-retrieval` shows `duration` and should accept fractional values
+  when it is built. `BookingActivityResponse` and `LaunchSummary` already hold it as a `BigDecimal`.
 - **ADD**: the system architecture section describes `Main` without saying that it returns the exit
   code, which ADR-7 now states.
 - **`/build`**: it requires the API to respond even for a spec that does not use it.
@@ -27,6 +27,10 @@ Improvements that block nothing. Add them here and carry on with the current wor
   applies only to booking and selection flows. A user with no unused email can only leave by ending
   the input.
 - **ADD, ADR-10**: it lists three `ApiFailure` subclasses, while `feat-session` adds
-  `InvalidCredentialsFailure` and `SessionRejectedFailure`, raised only by `service`.
+  `InvalidCredentialsFailure` and `SessionRejectedFailure`, and `feat-booking-creation` adds
+  `NoSessionFailure` and `LaunchNotBookableFailure`, all raised only by `service`.
 - **`ConsoleMenu` size**: at about 275 lines, it could split its launch display and session flows
   into separate views.
+- **Fractional launches block booking**: until `fix-launch-parsing-robustness` is built, one launch
+  with a fractional value makes `GET /activities` fail, so the booking option shows the generic
+  error too.
