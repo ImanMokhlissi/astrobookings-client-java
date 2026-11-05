@@ -9,11 +9,16 @@ import dev.iman.astrobookings.model.ApiError;
 import dev.iman.astrobookings.model.ApiErrorFailure;
 import dev.iman.astrobookings.model.ApiFailure;
 import dev.iman.astrobookings.model.ApiNotReachableFailure;
+import dev.iman.astrobookings.model.AuthResponse;
 import dev.iman.astrobookings.model.ErrorResponse;
 import dev.iman.astrobookings.model.FieldError;
 import dev.iman.astrobookings.model.FieldErrorResponse;
 import dev.iman.astrobookings.model.Launch;
+import dev.iman.astrobookings.model.LoginRequest;
+import dev.iman.astrobookings.model.RegisterRequest;
+import dev.iman.astrobookings.model.Session;
 import dev.iman.astrobookings.model.UnauthorizedFailure;
+import dev.iman.astrobookings.model.User;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -29,7 +34,10 @@ import java.util.stream.Stream;
 public final class ApiClient {
 
     private static final String ACTIVITIES_PATH = "/activities";
+    private static final String USERS_PATH = "/users";
+    private static final String LOGIN_PATH = "/login";
     private static final String GENERIC_ERROR_MESSAGE = "The API returned an unexpected response.";
+    private static final int NO_RESPONSE_STATUS = 0;
     private static final int UNAUTHORIZED_STATUS = 401;
     private static final int FIRST_SUCCESS_STATUS = 200;
     private static final int LAST_SUCCESS_STATUS = 299;
@@ -54,8 +62,38 @@ public final class ApiClient {
         return toLaunches(response);
     }
 
+    public Session register(String username, String email, String password) {
+        return authenticate(USERS_PATH, new RegisterRequest(username, email, password, true));
+    }
+
+    public Session login(String email, String password) {
+        return authenticate(LOGIN_PATH, new LoginRequest(email, password));
+    }
+
+    private Session authenticate(String path, Object requestBody) {
+        HttpResponse<String> response = send(buildPostRequest(path, toJson(requestBody)));
+        throwIfFailed(response);
+        return toSession(response);
+    }
+
     private HttpRequest buildGetRequest(String path) {
         return HttpRequest.newBuilder(urlOf(path)).timeout(requestTimeout).GET().build();
+    }
+
+    private HttpRequest buildPostRequest(String path, String json) {
+        return HttpRequest.newBuilder(urlOf(path))
+                .timeout(requestTimeout)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(json))
+                .build();
+    }
+
+    private String toJson(Object requestBody) {
+        try {
+            return mapper.writeValueAsString(requestBody);
+        } catch (JsonProcessingException e) {
+            throw new ApiErrorFailure(genericError(NO_RESPONSE_STATUS));
+        }
     }
 
     private URI urlOf(String path) {
@@ -137,6 +175,38 @@ public final class ApiClient {
                 activity.status());
     }
 
+    private Session toSession(HttpResponse<String> response) {
+        return readAuthResponse(response.body())
+                .map(ApiClient::toSession)
+                .orElseThrow(() -> new ApiErrorFailure(genericError(response.statusCode())));
+    }
+
+    /** An empty result means that the body is not a complete authentication response. */
+    private Optional<AuthResponse> readAuthResponse(String body) {
+        try {
+            return Optional.ofNullable(mapper.readValue(body, AuthResponse.class))
+                    .filter(ApiClient::isComplete);
+        } catch (JsonProcessingException e) {
+            return Optional.empty();
+        }
+    }
+
+    private static boolean isComplete(AuthResponse authResponse) {
+        return authResponse.user() != null
+                && hasText(authResponse.accessToken())
+                && hasText(authResponse.user().username())
+                && hasText(authResponse.user().email());
+    }
+
+    private static Session toSession(AuthResponse authResponse) {
+        User user = authResponse.user();
+        return new Session(authResponse.accessToken(), user.username(), user.email());
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
     private ApiError toApiError(int status, String body) {
         try {
             ErrorResponse error = mapper.readValue(body, ErrorResponse.class);
@@ -151,8 +221,7 @@ public final class ApiClient {
 
     private static boolean isWellFormed(ErrorResponse error) {
         return error != null
-                && error.message() != null
-                && !error.message().isBlank()
+                && hasText(error.message())
                 && (error.errors() == null || error.errors().stream().allMatch(ApiClient::isWellFormed));
     }
 

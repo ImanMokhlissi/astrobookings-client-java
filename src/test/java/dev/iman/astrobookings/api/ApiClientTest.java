@@ -5,12 +5,14 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.iman.astrobookings.FakeApiServer;
 import dev.iman.astrobookings.model.ApiError;
 import dev.iman.astrobookings.model.ApiErrorFailure;
 import dev.iman.astrobookings.model.ApiNotReachableFailure;
 import dev.iman.astrobookings.model.FieldError;
 import dev.iman.astrobookings.model.Launch;
+import dev.iman.astrobookings.model.Session;
 import dev.iman.astrobookings.model.UnauthorizedFailure;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -29,6 +31,10 @@ class ApiClientTest {
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
     private static final Duration SHORT_TIMEOUT = Duration.ofMillis(200);
     private static final String GENERIC_MESSAGE = "The API returned an unexpected response.";
+    private static final String AUTH_BODY = """
+            {"user":{"username":"ana","email":"ana@example.com"},"accessToken":"token-1"}
+            """;
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private FakeApiServer fakeApi;
 
@@ -280,6 +286,123 @@ class ApiClientTest {
         ApiErrorFailure failure = fetchExpectingApiError();
 
         assertEquals(new ApiError(400, GENERIC_MESSAGE, List.of()), failure.apiError());
+    }
+
+    @Test
+    void should_send_the_username_email_password_and_terms_when_registering() throws IOException {
+        fakeApi.respondWith(201, AUTH_BODY);
+
+        apiClient(fakeApi.url()).register("ana", "ana@example.com", " secret ");
+
+        assertEquals("POST", fakeApi.receivedMethod());
+        assertEquals("/users", fakeApi.receivedPath());
+        assertEquals("application/json", fakeApi.receivedContentType());
+        assertEquals(
+                JSON.readTree("""
+                        {"username":"ana","email":"ana@example.com","password":" secret ","terms":true}
+                        """),
+                JSON.readTree(fakeApi.receivedBodies().get(0)));
+    }
+
+    @Test
+    void should_send_the_email_and_password_when_logging_in() throws IOException {
+        fakeApi.respondWith(200, AUTH_BODY);
+
+        apiClient(fakeApi.url()).login("ana@example.com", "secret");
+
+        assertEquals("POST", fakeApi.receivedMethod());
+        assertEquals("/login", fakeApi.receivedPath());
+        assertEquals("application/json", fakeApi.receivedContentType());
+        assertEquals(
+                JSON.readTree("{\"email\":\"ana@example.com\",\"password\":\"secret\"}"),
+                JSON.readTree(fakeApi.receivedBodies().get(0)));
+    }
+
+    @Test
+    void should_return_the_session_when_registering_succeeds() {
+        fakeApi.respondWith(201, AUTH_BODY);
+
+        Session session = apiClient(fakeApi.url()).register("ana", "ana@example.com", "secret");
+
+        assertEquals(new Session("token-1", "ana", "ana@example.com"), session);
+    }
+
+    @Test
+    void should_return_the_session_when_logging_in_succeeds() {
+        fakeApi.respondWith(200, AUTH_BODY);
+
+        Session session = apiClient(fakeApi.url()).login("ana@example.com", "secret");
+
+        assertEquals(new Session("token-1", "ana", "ana@example.com"), session);
+    }
+
+    @Test
+    void should_ignore_the_other_user_fields_when_the_api_sends_them() {
+        fakeApi.respondWith(201, """
+                {"user":{"id":"user-1","username":"ana","email":"ana@example.com","terms":true},
+                 "accessToken":"token-1","other":7}
+                """);
+
+        Session session = apiClient(fakeApi.url()).register("ana", "ana@example.com", "secret");
+
+        assertEquals(new Session("token-1", "ana", "ana@example.com"), session);
+    }
+
+    @Test
+    void should_fail_with_the_field_errors_when_the_email_is_repeated() {
+        fakeApi.respondWith(400, """
+                {"message":"Invalid data","errors":[{"field":"email","message":"Email is already registered"}]}
+                """);
+        ApiClient apiClient = apiClient(fakeApi.url());
+
+        ApiErrorFailure failure = assertThrows(
+                ApiErrorFailure.class, () -> apiClient.register("ana", "ana@example.com", "secret"));
+
+        assertEquals(
+                new ApiError(400, "Invalid data", List.of(new FieldError("email", "Email is already registered"))),
+                failure.apiError());
+    }
+
+    @Test
+    void should_fail_as_unauthorized_when_login_responds_401() {
+        fakeApi.respondWith(401, "{\"message\":\"Authentication failed\",\"errors\":[]}");
+        ApiClient apiClient = apiClient(fakeApi.url());
+
+        UnauthorizedFailure failure =
+                assertThrows(UnauthorizedFailure.class, () -> apiClient.login("ana@example.com", "secret"));
+
+        assertEquals(new ApiError(401, "Authentication failed", List.of()), failure.apiError());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "",
+        "<html>",
+        "null",
+        "[]",
+        "{}",
+        "{\"accessToken\":\"token-1\"}",
+        "{\"user\":null,\"accessToken\":\"token-1\"}",
+        "{\"user\":\"ana\",\"accessToken\":\"token-1\"}",
+        "{\"user\":{\"username\":\"ana\",\"email\":\"ana@example.com\"}}",
+        "{\"user\":{\"username\":\"ana\",\"email\":\"ana@example.com\"},\"accessToken\":null}",
+        "{\"user\":{\"username\":\"ana\",\"email\":\"ana@example.com\"},\"accessToken\":\"  \"}",
+        "{\"user\":{\"email\":\"ana@example.com\"},\"accessToken\":\"token-1\"}",
+        "{\"user\":{\"username\":\" \",\"email\":\"ana@example.com\"},\"accessToken\":\"token-1\"}",
+        "{\"user\":{\"username\":\"ana\"},\"accessToken\":\"token-1\"}",
+        "{\"user\":{\"username\":\"ana\",\"email\":\"\"},\"accessToken\":\"token-1\"}"
+    })
+    void should_fail_with_a_generic_error_when_the_auth_response_is_incomplete(String body) {
+        fakeApi.respondWith(200, body);
+        ApiClient apiClient = apiClient(fakeApi.url());
+
+        ApiErrorFailure registerFailure = assertThrows(
+                ApiErrorFailure.class, () -> apiClient.register("ana", "ana@example.com", "secret"));
+        ApiErrorFailure loginFailure =
+                assertThrows(ApiErrorFailure.class, () -> apiClient.login("ana@example.com", "secret"));
+
+        assertEquals(new ApiError(200, GENERIC_MESSAGE, List.of()), registerFailure.apiError());
+        assertEquals(new ApiError(200, GENERIC_MESSAGE, List.of()), loginFailure.apiError());
     }
 
     private ApiErrorFailure fetchExpectingApiError() {

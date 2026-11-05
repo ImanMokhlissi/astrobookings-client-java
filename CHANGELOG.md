@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-05
+
+### Added
+
+- Customers can register from the console with a username, email and password after accepting the terms, and are asked for another email if theirs is already registered.
+- Customers can log in, and are told when the email or password was not accepted and offered to register instead.
+- The session is saved in `~/.astrobookings/session.json`, without the password, and reused on the next run, and the menu shows who is logged in.
+- Customers can log out, which deletes the saved session.
+- Customers are told when the saved session cannot be read, and the client continues with no session.
+- When the API rejects a session, the saved session is deleted and customers are asked to register again.
+
 ## [0.1.0] - 2026-11-05
 
 ### Added

@@ -6,6 +6,10 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -15,17 +19,22 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public final class FakeApiServer {
 
+    private record CannedResponse(int status, String body) {
+    }
+
     private final CountDownLatch releaseBlockedHandlers = new CountDownLatch(1);
     private final AtomicInteger receivedRequests = new AtomicInteger();
+    private final List<String> receivedBodies = new CopyOnWriteArrayList<>();
+    private final Queue<CannedResponse> queuedResponses = new ConcurrentLinkedQueue<>();
     private final HttpServer server;
     private final String url;
 
-    private volatile int responseStatus = 200;
-    private volatile String responseBody = "[]";
+    private volatile CannedResponse defaultResponse = new CannedResponse(200, "[]");
     private volatile boolean blocking = false;
     private volatile String receivedMethod;
     private volatile String receivedPath;
     private volatile String receivedAuthorization;
+    private volatile String receivedContentType;
 
     private FakeApiServer(HttpServer server, String url) {
         this.server = server;
@@ -51,8 +60,12 @@ public final class FakeApiServer {
     }
 
     public void respondWith(int status, String body) {
-        responseStatus = status;
-        responseBody = body;
+        defaultResponse = new CannedResponse(status, body);
+    }
+
+    /** Queued responses answer the next requests in order, before the {@link #respondWith} one. */
+    public void queueResponse(int status, String body) {
+        queuedResponses.add(new CannedResponse(status, body));
     }
 
     /** The next requests get no response until the server stops. */
@@ -85,6 +98,15 @@ public final class FakeApiServer {
         return receivedAuthorization;
     }
 
+    public String receivedContentType() {
+        return receivedContentType;
+    }
+
+    /** The body of each request, in the order they arrived. */
+    public List<String> receivedBodies() {
+        return List.copyOf(receivedBodies);
+    }
+
     private void handle(HttpExchange exchange) throws IOException {
         recordRequest(exchange);
         if (blocking) {
@@ -92,23 +114,30 @@ public final class FakeApiServer {
             exchange.close();
             return;
         }
-        byte[] bytes = responseBody.getBytes(StandardCharsets.UTF_8);
+        CannedResponse queued = queuedResponses.poll();
+        respond(exchange, queued != null ? queued : defaultResponse);
+    }
+
+    private static void respond(HttpExchange exchange, CannedResponse response) throws IOException {
+        byte[] bytes = response.body().getBytes(StandardCharsets.UTF_8);
         if (bytes.length == 0) {
-            exchange.sendResponseHeaders(responseStatus, -1);
+            exchange.sendResponseHeaders(response.status(), -1);
             exchange.close();
             return;
         }
         exchange.getResponseHeaders().set("Content-Type", "application/json");
-        exchange.sendResponseHeaders(responseStatus, bytes.length);
+        exchange.sendResponseHeaders(response.status(), bytes.length);
         try (var body = exchange.getResponseBody()) {
             body.write(bytes);
         }
     }
 
-    private void recordRequest(HttpExchange exchange) {
+    private void recordRequest(HttpExchange exchange) throws IOException {
         receivedMethod = exchange.getRequestMethod();
         receivedPath = exchange.getRequestURI().getPath();
         receivedAuthorization = exchange.getRequestHeaders().getFirst("Authorization");
+        receivedContentType = exchange.getRequestHeaders().getFirst("Content-Type");
+        receivedBodies.add(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
         receivedRequests.incrementAndGet();
     }
 

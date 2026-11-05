@@ -23,3 +23,8 @@ Improvements that block nothing. Add them here and carry on with the current wor
 - **`fix-launch-parsing-robustness`, before building it**: decide whether a numeric string such as
   `"5"` counts as non-numeric in AC7. One launch with a missing or null value still fails the whole
   list, even a draft, and the API may send `null` for an overflowing value such as `1e999`.
+- **`feat-session` email re-prompt**: the AC3 prompt has no way to cancel, because ADR-13's `0`
+  applies only to booking and selection flows. A user with no unused email can only leave by ending
+  the input.
+- **ADD, ADR-10**: it lists three `ApiFailure` subclasses, while `feat-session` adds
+  `InvalidCredentialsFailure` and `SessionRejectedFailure`, raised only by `service`.
