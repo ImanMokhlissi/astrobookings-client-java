@@ -101,8 +101,8 @@ The client was built with [Claude Code](https://claude.com/claude-code), followi
 Spec-Driven Development: each piece of work starts as a spec with acceptance criteria, and a chain
 of specialized agents takes it from there.
 
-Human review of the PRD, ADD and every spec before merging, a confirmation before every release, and
-manual testing of the client. The manual test found a bug the automated tests missed: in Git Bash,
+The process included human review of the PRD, the ADD and every spec before merging, a confirmation
+before every release, and manual testing of the client. The manual test found a bug the automated tests missed: in Git Bash,
 `System.console().readPassword()` returns an empty string (workaround: `winpty java -jar ...` or
 PowerShell).
 
@@ -200,6 +200,25 @@ Open items, from [`project/BACKLOG.md`](project/BACKLOG.md):
 - **Tooling**: `/build` requires the API even for a spec that does not use it, `./mvnw package` gives
   overlapping-file warnings from the Jackson jars, and the `coding-java` examples have unreviewed
   compiler warnings.
+
+## Course mapping
+
+| Course module                | How it was applied                                                                 |
+|------------------------------|------------------------------------------------------------------------------------|
+| Rules                        | `AGENTS.md` and the skills in `.claude/skills/`.                                   |
+| Prompts as code              | The `/build` command, in `.claude/commands/build.md`.                              |
+| Analysis and architecture    | The `analyst` and `architect` agents: the PRD, and the ADD with ADRs and a Mermaid diagram. |
+| Specs and plans              | Specs with EARS acceptance criteria from the `product-owner`, and plans from the `engineer`. |
+| Implementation and release   | The `coder`, `tester`, `cleaner` and `devops` agents, with semver releases.        |
+| Builder                      | `/build`, with its coder and tester loop of at most 3 rounds.                      |
+
+Not used:
+
+- **MCP**: the specs live in the repository, not in issues.
+- **Background or cloud tasks**: they were not part of the workflow. `/build` runs its agents one at
+  a time and waits for each to finish.
+- **An orchestrator for the architecture phase**: the `analyst`, `architect` and `product-owner` were
+  launched separately.
 
 ## Course material
 
