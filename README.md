@@ -54,6 +54,10 @@ It listens on `http://localhost:3000`. Set `PORT` to use another port.
 java -jar target/astrobookings-client-0.4.0.jar
 ```
 
+**In Git Bash**, start the client with `winpty java -jar target/astrobookings-client-0.4.0.jar`, or
+run it from PowerShell or CMD. Without this, the password prompt returns an empty string when you
+register or log in (see `fix-password-input` in the [backlog](project/BACKLOG.md)).
+
 The client calls `http://localhost:3000` by default. To use another URL, set
 `ASTROBOOKINGS_API_URL`:
 
@@ -181,6 +185,9 @@ Limits of the product, which mostly come from the API:
 
 Open items, from [`project/BACKLOG.md`](project/BACKLOG.md):
 
+- **Password input**: in Git Bash, `System.console().readPassword()` returns an empty string, and
+  the workaround is described in [Build and run the client](#build-and-run-the-client). The
+  `fix-password-input` spec is on hold and not written yet.
 - **Launch parsing**: one launch with a fractional value makes the whole launch list fail, and the
   booking option with it. The `fix-launch-parsing-robustness` spec covers this, along with URLs with
   a query or fragment and responses that stall after their headers. It is written but on hold, and
