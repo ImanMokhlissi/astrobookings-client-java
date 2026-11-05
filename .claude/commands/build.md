@@ -18,7 +18,8 @@ Read the specs in `project/specs/`. A dependency is met when its spec's status i
 
 - **With an argument**: use that spec. If its dependencies are not met, stop and tell the user.
 - **With no argument**: use the first spec in alphabetical order with status `draft` whose
-  **Depends on** are all met. If there is none, stop and tell the user why.
+  **Depends on** are all met, skipping the specs on hold in `project/BACKLOG.md`. If there is none,
+  stop and tell the user why.
 
 Statuses change on the spec's branch and reach the default branch only with the release. So read
 the dependencies on the default branch. For the chosen spec, if its branch exists, switch to it
