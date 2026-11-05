@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-05
+
+### Added
+
+- Customers can book seats from the menu by choosing a published or confirmed launch from a numbered list and entering a number of seats, and see a confirmation with the booking id, launch name, seats and payment status.
+- Customers can enter 0 at either booking prompt to cancel, and are asked again when a launch number or a number of seats is not valid.
+- Customers who ask for more seats than are free see the available and requested numbers.
+- Customers are told when their payment is rejected and that no booking was created.
+- Customers with no session are told to register or log in before booking, and are told when no launches are open for booking.
+
 ## [0.2.0] - 2026-11-05
 
 ### Added

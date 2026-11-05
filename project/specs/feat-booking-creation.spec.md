@@ -1,7 +1,7 @@
 # Booking creation
 
 - **Type**: feat
-- **Status**: verified
+- **Status**: released
 - **Related**: FR6, FR7, TR6
 - **Depends on**: chore-build-setup, feat-launch-listing, feat-session
 
