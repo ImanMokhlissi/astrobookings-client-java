@@ -76,4 +76,4 @@
 **Known limitations**:
 
 - Bookings are tied to the userId in the token, and `GET /bookings` returns only the authenticated user's bookings. A user who registers again is a different user and cannot see their previous bookings.
-- After the API restarts, user ids start again and repeated emails are not always detected. This is a problem of the sample API.
+- In activity-bookings-express the services are created when the routes are imported, before loadAllData() fills the repositories. The email index and the user id counter start empty, so POST /login always fails and, after a restart, ids are reused and repeated emails may not be detected.
