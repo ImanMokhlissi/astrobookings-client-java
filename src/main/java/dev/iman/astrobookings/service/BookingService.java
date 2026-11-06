@@ -41,6 +41,18 @@ public final class BookingService {
                 () -> apiClient.createBooking(session.accessToken(), launch.id(), seats));
     }
 
+    /**
+     * Books a launch known only by its id, as a form sends it. The launch comes from a fresh list, so
+     * a stale or forged id cannot bypass the allow-list.
+     */
+    public Booking book(String launchId, BigInteger seats) {
+        Launch launch = listBookableLaunches().stream()
+                .filter(candidate -> candidate.id().equals(launchId))
+                .findFirst()
+                .orElseThrow(LaunchNotBookableFailure::new);
+        return book(launch, seats);
+    }
+
     /** A 401 here ends the session, because this call sends the token. */
     public List<Booking> listBookings() {
         Session session = requireSession();
