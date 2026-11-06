@@ -1,7 +1,7 @@
 # Web interface
 
 - **Type**: feat
-- **Status**: in-progress
+- **Status**: verified
 - **Related**: FR10, TR1
 - **Depends on**: feat-booking-retrieval
 
