@@ -2,7 +2,7 @@
 
 ## Overview
 
-**Vision**: Customers of AstroBookings, a fictional space travel company, can browse rocket launches, book seats and check their bookings from a terminal.
+**Vision**: Customers of AstroBookings, a fictional space travel company, can browse rocket launches, book seats and check their bookings from a terminal or a browser.
 
 **In scope**:
 
@@ -12,6 +12,7 @@
 - Logging out.
 - Booking seats on launches in status `published` or `confirmed`.
 - Viewing the user's bookings and their `paymentStatus`.
+- A web interface with the same features as the console. Like the console, it serves a single local user, not multiple users, with the session in `~/.astrobookings/session.json`.
 
 **Out of scope**:
 
@@ -34,12 +35,13 @@
 | FR7 | The user who requests more seats than are free sees the available and requested numbers.         | done        |
 | FR8 | The user can list their bookings and see the `paymentStatus` of each one.                        | done        |
 | FR9 | The user can view the details of a single booking, including its `paymentStatus`.                | done        |
+| FR10 | Web interface: the same features as the console (list launches, register/log in/log out, book seats, list and view my bookings) from a browser. | in-progress |
 
 ## Technical requirements
 
 | ID  | Description                                                                                       | Status      |
 |-----|---------------------------------------------------------------------------------------------------|-------------|
-| TR1 | Console application in Java 21, built with Maven through the Maven Wrapper, with no heavy frameworks. | done        |
+| TR1 | Application with console and web interfaces in Java 21, built with Maven through the Maven Wrapper, with no heavy frameworks. | in-progress |
 | TR2 | HTTP calls use `java.net.http.HttpClient` against the API URL configured with the environment variable `ASTROBOOKINGS_API_URL`, with `http://localhost:3000` as the default. | done        |
 | TR3 | JSON is handled with Jackson, and API fields not listed in the constraints are ignored.           | done        |
 | TR4 | The client says "launches" to the user and maps them internally to the API's "activities". Exception: API error messages are shown verbatim, so they may say 'activity' (see ADR-3). | done        |
@@ -58,7 +60,7 @@
 **Constraints**:
 
 - The client depends on the activity-bookings-express API, which must be reachable at the configured URL (`ASTROBOOKINGS_API_URL`), by default `http://localhost:3000`.
-- The console interface is in English.
+- The console and web interfaces are in English.
 - `GET /activities` is public and provides id, name, slug, price, date, duration, location, minParticipants, maxParticipants and status.
 - The launch list shows only `published` and `confirmed` launches.
 - `POST /users` takes {username, email, password, terms:true} and returns {user, accessToken}. The client uses the `username` and `email` fields of `user`. The token expires after 24 h.
