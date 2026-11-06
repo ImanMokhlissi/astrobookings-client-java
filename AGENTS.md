@@ -14,6 +14,7 @@ API constraints before working on any feature.
 - Language: Java 21
 - Build: Maven, through the Maven Wrapper
 - HTTP: `java.net.http.HttpClient`
+- Web server: the JDK's `com.sun.net.httpserver.HttpServer`
 - JSON: Jackson
 - Tests: JUnit 5
 - No heavy frameworks
@@ -56,7 +57,8 @@ cd ../activity-bookings-express && npm run dev
 │   └── specs/
 └── src/
     ├── main/
-    │   └── java/
+    │   ├── java/
+    │   └── resources/
     └── test/
         └── java/
 ```
@@ -65,6 +67,7 @@ cd ../activity-bookings-express && npm run dev
 - `project/`: documentation specific to this project.
 - `src/main/java/dev/iman/astrobookings/`: packages `cli`, `web`, `service`, `api`, `model`,
   `session`.
+- `src/main/resources/web/`: the web interface's CSS.
 
 ## Environment
 
