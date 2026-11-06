@@ -232,14 +232,6 @@ Open items, from [`project/BACKLOG.md`](project/BACKLOG.md):
 | Implementation and release   | The `coder`, `tester`, `cleaner` and `devops` agents, with semver releases.        |
 | Builder                      | `/build`, with its coder and tester loop of at most 3 rounds.                      |
 
-Not used:
-
-- **MCP**: the specs live in the repository, not in issues.
-- **Background or cloud tasks**: they were not part of the workflow. `/build` runs its agents one at
-  a time and waits for each to finish.
-- **An orchestrator for the architecture phase**: the `analyst`, `architect` and `product-owner` were
-  launched separately.
-
 ## Course material
 
 This repository started from the course's template.
