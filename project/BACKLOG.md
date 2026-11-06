@@ -41,6 +41,14 @@ Improvements that block nothing. Add them here and carry on with the current wor
   `feat-booking-retrieval`. A test pins this behaviour. The client itself only sends whole seats.
 - **Booking id `..`**: `ApiClient` encodes the id as one path segment, but dots stay as they are, so
   an id of exactly `..` is not handled or tested. The API's ids have the form `booking-N`.
+- **Web, DNS rebinding**: ADR-17 does not check the `Host` header, so a malicious page could read
+  a user's bookings through a rebound domain, though it cannot change anything. Rejecting unknown
+  `Host` values would close this.
+- **`testing-e2e-console`**: its "Drive the menu" rule covers only the console. For web tests,
+  ADR-18 applies, and the skill could gain a section for them.
+- **Docs after the web layer**: `project/briefing.md` still says "from a terminal", the Launch and
+  Booking rows of the ADD's data model name only `cli`, and the `AGENTS.md` folder tree and tech
+  stack list neither `src/main/resources` nor the HTTP server.
 - **PRD, known limitations**: the `POST /login` entry names only the services being created before
   `loadAllData()`. Also, `routes/auth.ts` and `routes/users.ts` each create their own `UserService`,
   so a user registered during the run cannot log in either.
