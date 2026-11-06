@@ -52,3 +52,6 @@ Improvements that block nothing. Add them here and carry on with the current wor
 - **PRD, known limitations**: the `POST /login` entry names only the services being created before
   `loadAllData()`. Also, `routes/auth.ts` and `routes/users.ts` each create their own `UserService`,
   so a user registered during the run cannot log in either.
+- **Web, unexpected failures**: the router answers a generic 500 for any unexpected
+  `RuntimeException` and records nothing, so the cause is not visible on the terminal.
+- **Web, 405**: the answer has no `Allow` header.
