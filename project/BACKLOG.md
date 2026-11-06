@@ -55,3 +55,8 @@ Improvements that block nothing. Add them here and carry on with the current wor
 - **Web, unexpected failures**: the router answers a generic 500 for any unexpected
   `RuntimeException` and records nothing, so the cause is not visible on the terminal.
 - **Web, 405**: the answer has no `Allow` header.
+- **`SeatsCheck` name**: `readWholeNumber` also reads the console's list numbers and `Main`'s web
+  port, which are not seats. `WholeNumberCheck` or similar would fit, but the plan and the tests use
+  the current name.
+- **`StartupErrorView` name**: it also shows the address of the running server, which is not an
+  error. ADR-16 and the spec use the current name.
