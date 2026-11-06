@@ -22,7 +22,7 @@ final class BookingPages {
 
     private static final String HEADING = "Book seats";
     private static final int PAYMENT_REJECTED_STATUS = 402;
-    private static final String NO_FAILURE = "";
+    private static final String NO_CONSEQUENCE = "";
     private static final String NO_FORM = "";
     private static final String NOTHING_TYPED = "";
     private static final String INVALID_SEATS = HtmlFields.error("The seats must be a whole number of at least 1.");
@@ -39,15 +39,10 @@ final class BookingPages {
     }
 
     WebResponse showForm() {
-        return layout.page(HEADING, freshForm());
-    }
-
-    private String freshForm() {
-        try {
-            return form(bookingService.listBookableLaunches(), NOTHING_TYPED, NOTHING_TYPED);
-        } catch (ApiFailure failure) {
-            return FailureView.html(failure);
-        }
+        return layout.page(
+                HEADING,
+                FailureView.contentOrFailure(
+                        () -> form(bookingService.listBookableLaunches(), NOTHING_TYPED, NOTHING_TYPED)));
     }
 
     WebResponse book(FormData form) {
@@ -78,13 +73,12 @@ final class BookingPages {
 
     private static String apiErrorWithConsequence(ApiErrorFailure failure) {
         boolean paymentRejected = failure.apiError().status() == PAYMENT_REJECTED_STATUS;
-        return FailureView.html(failure) + (paymentRejected ? NO_BOOKING_CREATED : NO_FAILURE);
+        return FailureView.html(failure) + (paymentRejected ? NO_BOOKING_CREATED : NO_CONSEQUENCE);
     }
 
     /** The failure stays on the page even when the fresh list also fails, with no form then. */
     private WebResponse formAgain(String failure, String launchId, String typedSeats) {
-        String formAfterFailure = formFromFreshListOrNothing(launchId, typedSeats);
-        return layout.page(HEADING, failure + formAfterFailure);
+        return layout.page(HEADING, failure + formFromFreshListOrNothing(launchId, typedSeats));
     }
 
     private String formFromFreshListOrNothing(String launchId, String typedSeats) {
@@ -97,21 +91,24 @@ final class BookingPages {
 
     private static String form(List<Launch> launches, String chosenLaunchId, String typedSeats) {
         if (launches.isEmpty()) {
-            return HtmlFields.message("No launches open for booking.");
+            return LaunchesPage.NO_OPEN_LAUNCHES;
         }
+        return HtmlFields.form(
+                "/book",
+                "Book",
+                launchChoice(launches, chosenLaunchId),
+                HtmlFields.textInput("seats", "Seats", typedSeats));
+    }
+
+    private static String launchChoice(List<Launch> launches, String chosenLaunchId) {
         String options = launches.stream()
                 .map(launch -> option(launch, chosenLaunchId))
                 .collect(Collectors.joining());
         return """
-                <form method="post" action="/book">
                 <label for="launchId">Launch</label>
                 <select id="launchId" name="launchId">
                 %s</select>
-                <label for="seats">Seats</label>
-                <input type="text" id="seats" name="seats" value="%s">
-                <button type="submit">Book</button>
-                </form>
-                """.formatted(options, escape(typedSeats));
+                """.formatted(options);
     }
 
     private static String option(Launch launch, String chosenLaunchId) {

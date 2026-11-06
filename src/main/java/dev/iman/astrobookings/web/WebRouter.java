@@ -71,23 +71,26 @@ final class WebRouter implements HttpHandler {
         }
         String rawPath = exchange.getRequestURI().getRawPath();
         return switch (rawPath) {
-            case "/" -> dispatch(method, launchesPage::show, this::methodNotAllowed);
+            case "/" -> getOnly(method, launchesPage::show);
             case "/register" -> dispatch(
                     method, sessionPages::showRegistration, () -> sessionPages.register(readForm(exchange)));
             case "/login" -> dispatch(method, sessionPages::showLogin, () -> sessionPages.login(readForm(exchange)));
             case "/logout" -> dispatch(method, this::methodNotAllowed, sessionPages::logout);
             case "/book" -> dispatch(method, bookingPages::showForm, () -> bookingPages.book(readForm(exchange)));
-            case "/bookings" -> dispatch(method, bookingRetrievalPages::showBookings, this::methodNotAllowed);
-            case "/style.css" -> dispatch(method, WebRouter::styleSheet, this::methodNotAllowed);
+            case "/bookings" -> getOnly(method, bookingRetrievalPages::showBookings);
+            case "/style.css" -> getOnly(method, WebRouter::styleSheet);
             default -> routeBookingDetail(method, rawPath);
         };
     }
 
     private WebResponse routeBookingDetail(String method, String rawPath) {
         return BookingIdPath.idFrom(rawPath)
-                .map(bookingId -> dispatch(
-                        method, () -> bookingRetrievalPages.showBooking(bookingId), this::methodNotAllowed))
+                .map(bookingId -> getOnly(method, () -> bookingRetrievalPages.showBooking(bookingId)))
                 .orElseGet(this::notFound);
+    }
+
+    private WebResponse getOnly(String method, Supplier<WebResponse> onGet) {
+        return dispatch(method, onGet, this::methodNotAllowed);
     }
 
     private WebResponse dispatch(String method, Supplier<WebResponse> onGet, Supplier<WebResponse> onPost) {

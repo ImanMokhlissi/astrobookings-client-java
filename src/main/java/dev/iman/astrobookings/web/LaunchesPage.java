@@ -1,6 +1,5 @@
 package dev.iman.astrobookings.web;
 
-import dev.iman.astrobookings.model.ApiFailure;
 import dev.iman.astrobookings.model.Launch;
 import dev.iman.astrobookings.service.LaunchDateFormatter;
 import dev.iman.astrobookings.service.LaunchService;
@@ -9,6 +8,8 @@ import java.util.stream.Collectors;
 
 /** The launches open for booking. */
 final class LaunchesPage {
+
+    static final String NO_OPEN_LAUNCHES = HtmlFields.message("No launches open for booking.");
 
     private static final String HEADING = "Launches";
 
@@ -21,25 +22,17 @@ final class LaunchesPage {
     }
 
     WebResponse show() {
-        return layout.page(HEADING, content());
+        return layout.page(HEADING, FailureView.contentOrFailure(() -> launchList(launchService.listOpenLaunches())));
     }
 
-    private String content() {
-        try {
-            return launches(launchService.listOpenLaunches());
-        } catch (ApiFailure failure) {
-            return FailureView.html(failure);
-        }
-    }
-
-    private static String launches(List<Launch> launches) {
+    private static String launchList(List<Launch> launches) {
         if (launches.isEmpty()) {
-            return HtmlFields.message("No launches open for booking.");
+            return NO_OPEN_LAUNCHES;
         }
-        return launches.stream().map(LaunchesPage::launch).collect(Collectors.joining());
+        return launches.stream().map(LaunchesPage::launchFields).collect(Collectors.joining());
     }
 
-    private static String launch(Launch launch) {
+    private static String launchFields(Launch launch) {
         return HtmlFields.list(
                 HtmlFields.field("Name", launch.name()),
                 HtmlFields.field("Price", launch.price().toPlainString()),

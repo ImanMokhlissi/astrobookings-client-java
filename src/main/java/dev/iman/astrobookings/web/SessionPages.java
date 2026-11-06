@@ -1,7 +1,5 @@
 package dev.iman.astrobookings.web;
 
-import static dev.iman.astrobookings.web.HtmlEscaper.escape;
-
 import dev.iman.astrobookings.model.ApiFailure;
 import dev.iman.astrobookings.model.InvalidCredentialsFailure;
 import dev.iman.astrobookings.model.SessionFileFailure;
@@ -14,6 +12,7 @@ final class SessionPages {
     private static final String LOG_IN_HEADING = "Log in";
     private static final String HOME_PATH = "/";
     private static final String NO_FAILURE = "";
+    private static final String NOTHING_TYPED = "";
     private static final String SESSION_NOT_SAVED = HtmlFields.error("The session could not be saved.");
     private static final String TERMS_NOT_ACCEPTED =
             HtmlFields.error("The terms were not accepted, so you were not registered.");
@@ -32,7 +31,7 @@ final class SessionPages {
     }
 
     WebResponse showRegistration() {
-        return registrationPage(NO_FAILURE, new RegistrationEntry("", "", false));
+        return registrationPage(NO_FAILURE, new RegistrationEntry(NOTHING_TYPED, NOTHING_TYPED, false));
     }
 
     WebResponse register(FormData form) {
@@ -43,7 +42,7 @@ final class SessionPages {
         }
         try {
             sessionService.register(entry.username().trim(), entry.email().trim(), form.value("password"));
-            return redirectAfterStartingSession();
+            return redirectAfterSessionChange();
         } catch (ApiFailure failure) {
             return registrationPage(FailureView.html(failure), entry);
         } catch (SessionFileFailure failure) {
@@ -52,14 +51,14 @@ final class SessionPages {
     }
 
     WebResponse showLogin() {
-        return loginPage(NO_FAILURE, "");
+        return loginPage(NO_FAILURE, NOTHING_TYPED);
     }
 
     WebResponse login(FormData form) {
         String email = form.value("email");
         try {
             sessionService.login(email.trim(), form.value("password"));
-            return redirectAfterStartingSession();
+            return redirectAfterSessionChange();
         } catch (InvalidCredentialsFailure failure) {
             return loginPage(LOGIN_REJECTED, email);
         } catch (ApiFailure failure) {
@@ -72,44 +71,39 @@ final class SessionPages {
     WebResponse logout() {
         try {
             sessionService.logout();
-            layout.forgetUnreadableSessionFile();
-            return WebResponse.redirect(HOME_PATH);
+            return redirectAfterSessionChange();
         } catch (SessionFileFailure failure) {
             return layout.page("Log out", HtmlFields.error("The session file could not be deleted."));
         }
     }
 
-    private WebResponse redirectAfterStartingSession() {
+    private WebResponse redirectAfterSessionChange() {
         layout.forgetUnreadableSessionFile();
         return WebResponse.redirect(HOME_PATH);
     }
 
     private WebResponse registrationPage(String failure, RegistrationEntry entry) {
-        return layout.page(REGISTER_HEADING, failure + """
-                <form method="post" action="/register">
-                <label for="username">Username</label>
-                <input type="text" id="username" name="username" value="%s">
-                <label for="email">Email</label>
-                <input type="text" id="email" name="email" value="%s">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password">
-                <label><input type="checkbox" name="terms" value="accepted"%s> I accept the terms</label>
-                <button type="submit">Register</button>
-                </form>
-                """.formatted(
-                        escape(entry.username()), escape(entry.email()), entry.termsAccepted() ? " checked" : ""));
+        return layout.page(REGISTER_HEADING, failure + HtmlFields.form(
+                "/register",
+                "Register",
+                HtmlFields.textInput("username", "Username", entry.username()),
+                HtmlFields.textInput("email", "Email", entry.email()),
+                HtmlFields.passwordInput(),
+                termsCheckbox(entry.termsAccepted())));
+    }
+
+    private static String termsCheckbox(boolean accepted) {
+        String checked = accepted ? " checked" : "";
+        return "<label><input type=\"checkbox\" name=\"terms\" value=\"accepted\"" + checked
+                + "> I accept the terms</label>\n";
     }
 
     private WebResponse loginPage(String failure, String email) {
-        return layout.page(LOG_IN_HEADING, LOGIN_BROKEN_STATEMENT + failure + """
-                <form method="post" action="/login">
-                <label for="email">Email</label>
-                <input type="text" id="email" name="email" value="%s">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password">
-                <button type="submit">Log in</button>
-                </form>
-                """.formatted(escape(email)));
+        return layout.page(LOG_IN_HEADING, LOGIN_BROKEN_STATEMENT + failure + HtmlFields.form(
+                "/login",
+                "Log in",
+                HtmlFields.textInput("email", "Email", email),
+                HtmlFields.passwordInput()));
     }
 
     /** What the user typed, as typed. It holds no password, so that no form can echo one. */

@@ -5,7 +5,8 @@ import java.nio.charset.StandardCharsets;
 /** One answer to a browser. An empty {@code location} means that it is not a redirect. */
 record WebResponse(int status, String contentType, byte[] body, String location) {
 
-    private static final int OK_STATUS = 200;
+    static final int OK_STATUS = 200;
+
     private static final int SEE_OTHER_STATUS = 303;
     private static final String NO_LOCATION = "";
     private static final String NO_CONTENT_TYPE = "";

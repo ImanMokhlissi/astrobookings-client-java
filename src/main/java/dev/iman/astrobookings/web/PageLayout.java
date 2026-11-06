@@ -6,8 +6,6 @@ import dev.iman.astrobookings.service.SessionService;
 /** The frame of every page: navigation, who is logged in, the logout form and the CSS link. */
 final class PageLayout {
 
-    private static final int OK_STATUS = 200;
-
     private final SessionService sessionService;
     private boolean sessionFileUnreadable;
 
@@ -22,7 +20,7 @@ final class PageLayout {
     }
 
     WebResponse page(String heading, String content) {
-        return page(OK_STATUS, heading, content);
+        return page(WebResponse.OK_STATUS, heading, content);
     }
 
     /** Call it after the service call, so that the page shows the session as it is after that call. */

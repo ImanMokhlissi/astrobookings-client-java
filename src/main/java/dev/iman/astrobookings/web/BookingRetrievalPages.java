@@ -2,7 +2,6 @@ package dev.iman.astrobookings.web;
 
 import static dev.iman.astrobookings.web.HtmlEscaper.escape;
 
-import dev.iman.astrobookings.model.ApiFailure;
 import dev.iman.astrobookings.model.Booking;
 import dev.iman.astrobookings.model.LaunchSummary;
 import dev.iman.astrobookings.service.BookingService;
@@ -27,18 +26,11 @@ final class BookingRetrievalPages {
     }
 
     WebResponse showBookings() {
-        return layout.page(LIST_HEADING, bookingsContent());
+        return layout.page(
+                LIST_HEADING, FailureView.contentOrFailure(() -> bookingList(bookingService.listBookings())));
     }
 
-    private String bookingsContent() {
-        try {
-            return bookings(bookingService.listBookings());
-        } catch (ApiFailure failure) {
-            return FailureView.html(failure);
-        }
-    }
-
-    private static String bookings(List<Booking> bookings) {
+    private static String bookingList(List<Booking> bookings) {
         if (bookings.isEmpty()) {
             return HtmlFields.message("You have no bookings.");
         }
@@ -59,15 +51,9 @@ final class BookingRetrievalPages {
     }
 
     WebResponse showBooking(String bookingId) {
-        return layout.page(DETAIL_HEADING, bookingContent(bookingId));
-    }
-
-    private String bookingContent(String bookingId) {
-        try {
-            return bookingDetail(bookingService.getBooking(bookingId));
-        } catch (ApiFailure failure) {
-            return FailureView.html(failure);
-        }
+        return layout.page(
+                DETAIL_HEADING,
+                FailureView.contentOrFailure(() -> bookingDetail(bookingService.getBooking(bookingId))));
     }
 
     private static String bookingDetail(Booking booking) {

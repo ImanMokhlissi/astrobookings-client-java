@@ -10,6 +10,7 @@ import dev.iman.astrobookings.model.LaunchNotBookableFailure;
 import dev.iman.astrobookings.model.NoSessionFailure;
 import dev.iman.astrobookings.model.SessionRejectedFailure;
 import dev.iman.astrobookings.model.UnauthorizedFailure;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /** Presents every failure as escaped HTML. API messages stay verbatim apart from the escaping. */
@@ -38,6 +39,15 @@ final class FailureView {
             case LaunchNotBookableFailure notBookable ->
                     HtmlFields.error("This launch is not open for booking.");
         };
+    }
+
+    /** The content that a service call produces, or the presentation of its failure. */
+    static String contentOrFailure(Supplier<String> content) {
+        try {
+            return content.get();
+        } catch (ApiFailure failure) {
+            return html(failure);
+        }
     }
 
     private static String apiError(ApiError apiError) {
