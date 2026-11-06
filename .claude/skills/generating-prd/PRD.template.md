@@ -14,7 +14,7 @@
 
 ## Functional requirements
 
-<!-- At most 9. Each description fits on one line and says what the user can do. -->
+<!-- At most 12. Each description fits on one line and says what the user can do. -->
 <!-- Status: not-started, in-progress or done. -->
 
 | ID  | Description                 | Status      |
