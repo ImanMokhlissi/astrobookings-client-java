@@ -35,13 +35,13 @@
 | FR7 | The user who requests more seats than are free sees the available and requested numbers.         | done        |
 | FR8 | The user can list their bookings and see the `paymentStatus` of each one.                        | done        |
 | FR9 | The user can view the details of a single booking, including its `paymentStatus`.                | done        |
-| FR10 | Web interface: the same features as the console (list launches, register/log in/log out, book seats, list and view my bookings) from a browser. | in-progress |
+| FR10 | Web interface: the same features as the console (list launches, register/log in/log out, book seats, list and view my bookings) from a browser. | done        |
 
 ## Technical requirements
 
 | ID  | Description                                                                                       | Status      |
 |-----|---------------------------------------------------------------------------------------------------|-------------|
-| TR1 | Application with console and web interfaces in Java 21, built with Maven through the Maven Wrapper, with no heavy frameworks. | in-progress |
+| TR1 | Application with console and web interfaces in Java 21, built with Maven through the Maven Wrapper, with no heavy frameworks. | done        |
 | TR2 | HTTP calls use `java.net.http.HttpClient` against the API URL configured with the environment variable `ASTROBOOKINGS_API_URL`, with `http://localhost:3000` as the default. | done        |
 | TR3 | JSON is handled with Jackson, and API fields not listed in the constraints are ignored.           | done        |
 | TR4 | The client says "launches" to the user and maps them internally to the API's "activities". Exception: API error messages are shown verbatim, so they may say 'activity' (see ADR-3). | done        |

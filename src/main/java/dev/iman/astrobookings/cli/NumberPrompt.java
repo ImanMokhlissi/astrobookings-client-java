@@ -1,17 +1,15 @@
 package dev.iman.astrobookings.cli;
 
+import dev.iman.astrobookings.service.SeatsCheck;
 import java.io.PrintStream;
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.regex.Pattern;
 
 /** Asks for a whole number where 0 cancels and an invalid entry asks again (ADR-13). */
 final class NumberPrompt {
-
-    private static final Pattern WHOLE_NUMBER = Pattern.compile("[0-9]+");
 
     private final Function<String, Optional<String>> promptFor;
     private final PrintStream output;
@@ -40,7 +38,7 @@ final class NumberPrompt {
             String prompt, Predicate<BigInteger> isAccepted, String invalidEntryMessage) {
         Optional<String> entry = promptFor.apply(prompt);
         while (entry.isPresent()) {
-            Optional<BigInteger> number = readWholeNumber(entry.get());
+            Optional<BigInteger> number = SeatsCheck.readWholeNumber(entry.get());
             if (number.filter(BigInteger.ZERO::equals).isPresent()) {
                 return Optional.empty();
             }
@@ -51,10 +49,5 @@ final class NumberPrompt {
             entry = promptFor.apply(prompt);
         }
         return Optional.empty();
-    }
-
-    /** Only ASCII digits count. {@code BigInteger} takes a number of any length. */
-    private static Optional<BigInteger> readWholeNumber(String entry) {
-        return WHOLE_NUMBER.matcher(entry).matches() ? Optional.of(new BigInteger(entry)) : Optional.empty();
     }
 }

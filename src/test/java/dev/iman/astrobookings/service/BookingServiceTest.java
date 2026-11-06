@@ -173,6 +173,47 @@ class BookingServiceTest {
         assertEquals(Optional.of(ANA), sessionService.currentSession());
     }
 
+    @Test
+    void should_send_the_id_of_the_launch_in_the_fresh_list_when_booking_by_id() {
+        startSession();
+        fakeApi.queueResponse(200, "[" + FakeApiServer.activityJson("Moon", "published") + "]");
+        fakeApi.queueResponse(201, BOOKING_BODY);
+
+        Booking booking = bookingService.book("id-Moon", TWO_SEATS);
+
+        assertEquals("booking-1", booking.id());
+        assertEquals("/bookings", fakeApi.receivedPath());
+        assertTrue(fakeApi.receivedBodies().get(1).contains("\"activityId\":\"id-Moon\""));
+    }
+
+    @Test
+    void should_fail_as_not_bookable_without_a_booking_request_when_the_id_is_not_in_the_list() {
+        startSession();
+        fakeApi.respondWith(200, "[" + FakeApiServer.activityJson("Moon", "published") + "]");
+
+        assertThrows(LaunchNotBookableFailure.class, () -> bookingService.book("id-forged", TWO_SEATS));
+
+        assertEquals(1, fakeApi.receivedRequests());
+        assertEquals("/activities", fakeApi.receivedPath());
+    }
+
+    @Test
+    void should_fail_as_not_bookable_without_a_booking_request_when_the_id_is_of_a_launch_that_is_not_open() {
+        startSession();
+        fakeApi.respondWith(200, "[" + FakeApiServer.activityJson("Moon", "draft") + "]");
+
+        assertThrows(LaunchNotBookableFailure.class, () -> bookingService.book("id-Moon", TWO_SEATS));
+
+        assertEquals(1, fakeApi.receivedRequests());
+    }
+
+    @Test
+    void should_fail_as_no_session_without_calling_the_api_when_booking_by_id_with_no_session() {
+        assertThrows(NoSessionFailure.class, () -> bookingService.book("id-Moon", TWO_SEATS));
+
+        assertEquals(0, fakeApi.receivedRequests());
+    }
+
     @ParameterizedTest
     @EnumSource(Retrieval.class)
     void should_fail_as_no_session_without_calling_the_api_when_retrieving_with_no_session(Retrieval retrieval) {

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-06
+
+### Added
+
+- Customers can use AstroBookings from a browser by starting the client with `--web` and opening `http://127.0.0.1:8080/`. `ASTROBOOKINGS_WEB_PORT` sets another port.
+- The web interface offers the same features as the console: listing launches, registering, logging in and out, booking seats, and listing and viewing bookings with their payment status.
+- The web interface serves a single local user, shares the saved session file with the console, and is reachable only from the same machine. Forms sent from other websites are refused.
+- Registering from the browser avoids the empty password problem of the Git Bash console, with no need for `winpty`.
+- Customers see readable errors in the browser when the API is down or rejects a request, and a readable message on the terminal when the web port is invalid or busy.
+
 ## [0.4.0] - 2026-11-06
 
 ### Added

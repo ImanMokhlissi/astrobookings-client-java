@@ -2,24 +2,26 @@
 
 ## Resumen en español
 
-Cliente de consola en Java 21 para la API de ejemplo del curso Programación Inteligente: permite
-listar lanzamientos, registrarse, reservar plazas y consultar las reservas. Se construyó con Claude
-Code siguiendo Spec-Driven Development: cada funcionalidad parte de una spec con criterios de
+Cliente de consola y web en Java 21 para la API de ejemplo del curso Programación Inteligente:
+permite listar lanzamientos, registrarse, reservar plazas y consultar las reservas, desde el menú de
+consola o desde un navegador con `--web`. Se construyó con Claude Code siguiendo Spec-Driven
+Development: cada funcionalidad parte de una spec con criterios de
 aceptación y pasa por una cadena de agentes. Hubo revisión humana del PRD, el ADD y cada spec antes
 de fusionarlos, una confirmación antes de cada release y pruebas manuales del cliente, que
 encontraron un bug que los tests automáticos no detectaron: en Git Bash,
 `System.console().readPassword()` devuelve una cadena vacía (solución provisional:
-`winpty java -jar ...` o PowerShell). La versión actual es la v0.4.0, con 392 tests unitarios y 46 end-to-end. Es un ejercicio de formación, no un producto para
+`winpty java -jar ...` o PowerShell; el formulario de registro web no tiene este problema). La
+versión actual es la v0.5.0, con 520 tests unitarios y 58 end-to-end, todos superados. Es un ejercicio de formación, no un producto para
 producción. El resto del documento está en inglés, como el proyecto.
 
 ## What it is
 
-A console client written in Java 21 for the course's sample API,
+A console and web client written in Java 21 for the course's sample API,
 [activity-bookings-express](https://github.com/Programacion-Inteligente/activity-bookings-express).
 AstroBookings is a fictional space travel company, so the client says "launches" where the API says
 "activities".
 
-Features:
+Features, in both the console menu and the web interface:
 
 - List the launches open for booking.
 - Register, log in and log out, with the session saved in `~/.astrobookings/session.json`.
@@ -51,10 +53,10 @@ It listens on `http://localhost:3000`. Set `PORT` to use another port.
 
 ```bash
 ./mvnw package
-java -jar target/astrobookings-client-0.4.0.jar
+java -jar target/astrobookings-client-0.5.0.jar
 ```
 
-**In Git Bash**, start the client with `winpty java -jar target/astrobookings-client-0.4.0.jar`, or
+**In Git Bash**, start the console client with `winpty java -jar target/astrobookings-client-0.5.0.jar`, or
 run it from PowerShell or CMD. Without this, the password prompt returns an empty string when you
 register or log in (see `fix-password-input` in the [backlog](project/BACKLOG.md)).
 
@@ -62,7 +64,7 @@ The client calls `http://localhost:3000` by default. To use another URL, set
 `ASTROBOOKINGS_API_URL`:
 
 ```bash
-ASTROBOOKINGS_API_URL=http://localhost:4000 java -jar target/astrobookings-client-0.4.0.jar
+ASTROBOOKINGS_API_URL=http://localhost:4000 java -jar target/astrobookings-client-0.5.0.jar
 ```
 
 If the API is down, the client shows `API not reachable at <url>` and returns to the menu.
@@ -81,6 +83,23 @@ AstroBookings
 0. Exit
 Select an option:
 ```
+
+### Start the web interface
+
+```bash
+java -jar target/astrobookings-client-0.5.0.jar --web
+```
+
+The client prints the address, and you open it in a browser: <http://127.0.0.1:8080/>. To use another
+port, set `ASTROBOOKINGS_WEB_PORT` (the default is 8080):
+
+```bash
+ASTROBOOKINGS_WEB_PORT=9090 java -jar target/astrobookings-client-0.5.0.jar --web
+```
+
+It listens only on 127.0.0.1 and serves a single local user, with the same session file as the
+console. The web registration form does not go through the Git Bash password problem described
+above, and needs no `winpty`.
 
 ### Run the tests
 
@@ -141,7 +160,7 @@ Where everything is:
 
 ## Result
 
-- **Versions**: v0.1.0 to v0.4.0, one per feature spec. The `chore-build-setup` spec has no version
+- **Versions**: v0.1.0 to v0.5.0, one per feature spec. The `chore-build-setup` spec has no version
   of its own, and its work is listed under v0.1.0. See the [changelog](CHANGELOG.md).
 
   | Version | Spec                    | Adds                              |
@@ -150,8 +169,9 @@ Where everything is:
   | v0.2.0  | `feat-session`          | Register, log in, log out and the saved session |
   | v0.3.0  | `feat-booking-creation` | Booking seats                     |
   | v0.4.0  | `feat-booking-retrieval` | Listing and viewing bookings     |
+  | v0.5.0  | `feat-web-ui`           | The web interface                 |
 
-- **Tests**: 392 unit tests and 46 end-to-end tests, all passing on v0.4.0.
+- **Tests**: 520 unit tests and 58 end-to-end tests, all passing on v0.5.0.
 
 ## Findings about the API
 
