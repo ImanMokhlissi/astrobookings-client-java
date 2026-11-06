@@ -1,4 +1,4 @@
-package dev.iman.astrobookings.cli;
+package dev.iman.astrobookings.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 

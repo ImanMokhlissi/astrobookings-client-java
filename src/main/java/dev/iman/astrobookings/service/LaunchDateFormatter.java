@@ -1,4 +1,4 @@
-package dev.iman.astrobookings.cli;
+package dev.iman.astrobookings.service;
 
 import java.time.DateTimeException;
 import java.time.Instant;
@@ -9,7 +9,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 /** Formats a launch's date for display, independently of the machine's language and time zone. */
-final class LaunchDateFormatter {
+public final class LaunchDateFormatter {
 
     private static final DateTimeFormatter DATE_FORMAT =
             DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.ENGLISH);
@@ -20,7 +20,7 @@ final class LaunchDateFormatter {
     }
 
     /** Returns the date for display, or the same text when it is neither a date nor an instant. */
-    static String format(String text) {
+    public static String format(String text) {
         return formatAsDate(text).or(() -> formatAsInstant(text)).orElse(text);
     }
 
